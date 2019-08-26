@@ -27,7 +27,7 @@ create table if not exists Culture(
   -- culture on a field
   Field_ID INTEGER,
   Culture_ID INTEGER PRIMARY KEY,
-  Declaration Date, -- date of crop declaration
+  Declaration VARCHAR, -- date of crop declaration
   Crop INTEGER,
   UNIQUE(Field_ID, Declaration) ON CONFLICT IGNORE,
   FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE
@@ -36,7 +36,7 @@ create table if not exists Phase(
   -- Phse of a culture
   Culture_ID INTEGER,
   Phase_ID INTEGER PRIMARY KEY,
-  Transition Date, -- date of Phase transition
+  Transition VARCHAR, -- date of Phase transition
   P INTEGER, -- Phase code
   FOREIGN KEY (Culture_ID) REFERENCES Culture(Culture_ID) ON DELETE CASCADE
 );
@@ -53,7 +53,7 @@ create table if not exists Position(
     -- Erosion happening on a specific field
     Event_ID INTEGER PRIMARY KEY,
     Field_ID INTEGER, -- field where the erosion occure
-    Event_Date Date,
+    Event_Date VARCHAR,
     UNIQUE(Field_ID, Event_Date) ON CONFLICT IGNORE,
     FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE);
 
@@ -97,7 +97,7 @@ on w.Field_ID = c.Field_ID;
 
 Drop view IF EXISTS editField;
 CREATE VIEW IF NOT EXISTS editField
-AS
+AS -- all the required information to edit a field
 Select *
 from Zone z
 INNER JOIN Field f

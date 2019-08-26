@@ -1,10 +1,12 @@
 #https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
 #https://plotly-r.com/
-W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
+#W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
+W.DIR = "~/Dropbox/Kuhn/phenology/PhenoErosion"
 setwd(W.DIR)
 
 source("Functions_Pheno.R")
 source("Database.R")
+source("GraphErosion.R")
 library(tidyverse)
 library(shiny)
 library(leaflet)
@@ -43,9 +45,6 @@ ui = fluidPage(
     column(2,
            actionButton("compute", "Compute", icon = icon("play")),
            actionButton("deselectAll", "Deselect All")),
-    column(2, radioButtons("clickSelect", "Mode:", inline=TRUE,
-                        choices=c("Select"="select", "Delete"="delete"),
-                        selected="select")),
     column(2, fileInput("geofile", "Import Geojson", accept = c(".geojson"))),
     column(2, downloadButton("downloadData", "Save"),
            fileInput("openData", "Open") ),
@@ -68,8 +67,7 @@ editField = function(conn, Field_ID){
   saveChoice = setNames(c(Field_ID), c("SAVE") )
   field = h3(
     Zone_Name,
-    textInput("editName", NULL, value=Name, width = "25%"),
-    actionButton("editSave", "SAVE", icon = icon("save"))
+    textInput("editName", NULL, value=Name, width = "25%")
   )
   ### Erosion ###
   erosion = fbase %>% dplyr::select(Event_ID, Event_Date) %>%
@@ -101,24 +99,45 @@ editField = function(conn, Field_ID){
   }else{
     culturediv = div(newCulture) 
   }
-  
+  deleteField = actionButton("deleteField", "DELETE", icon = icon("trash"))
   
   insertUI(
     selector = "#fieldedit", where = "afterBegin",
-    ui = div(field, erodiv, culturediv, id = "currentField")
+    ui = div(field, erodiv, culturediv, deleteField, id = "currentField")
   )
   
 }
 
+############### SERVER ############################
 server = function(input, output, session){
   
-  session$userData$conn = Init_database(":memory:")
+  session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:"))
+  session$onSessionEnded(function() {
+    dbDisconnect(session$userData$conn)
+  })
   session$userData$currentGeo = list()
   session$userData$currentShape = 0
+  refreshPlot = reactiveVal(TRUE)
   
-  observe({
+  observeEvent(input$compute, {
+    showModal(modalDialog(
+      helpText("Loading"),
+      footer =NULL))
+    Import_Phase(session$userData$conn)
+    progress <- shiny::Progress$new()
+    # Make sure it closes when we exit this reactive, even if there's an error
+    on.exit(progress$close())
+    
+    progress$set(message = "Extracting data", value = 0)
+    Import_Measure(session$userData$conn, progress=progress$set)
+    
+    removeModal()
+    # refresh plot
+    isolate(refreshPlot(!refreshPlot()))
+  })
+  
+  observeEvent(input$geofile, {
     # when the user upload a Geojson file
-    req(input$geofile)
     # remember its path and name
     session$userData$currentGeo["name"] = input$geofile$name
     session$userData$currentGeo["path"] = input$geofile$datapath
@@ -169,15 +188,16 @@ server = function(input, output, session){
                           Field_ID == clickID))
     removeUI("#currentField")
     editField(session$userData$conn, clickID)
-    
+    isolate(refreshPlot(!refreshPlot()))
   }
   
-  observeEvent(input$editSave, {
+  observe({
+    Name = input$editName
     conn = session$userData$conn
     Field_ID = session$userData$currentShape
     print(Field_ID)
-    if(is.null(Field_ID)){return(NULL)}
-    Name = input$editName
+    if(Field_ID==0){return(NULL)}
+    
     dbExecute(conn, "UPDATE Field set Name=? where Field_ID=?",
               param = list(Name, Field_ID))
     erodelete = input$deleteErosion
@@ -198,7 +218,7 @@ server = function(input, output, session){
                 param = list(culID))
     })
     cuturedate = input$newDeclaration
-    cuturecrop = input$CropSelect
+    cuturecrop = isolate(input$CropSelect)
     if(length(cuturedate)){
       dbWriteTable(conn, "Culture",tibble(
         Field_ID = Field_ID,
@@ -206,10 +226,19 @@ server = function(input, output, session){
         Crop = cuturecrop
       ), append = TRUE)
     }
-    
     removeUI("#currentField")
     editField(session$userData$conn, Field_ID)
-    
+    # refresh plot
+    isolate(refreshPlot(!refreshPlot()))
+  })
+  
+  observeEvent(input$deleteField, {
+    conn = session$userData$conn
+    Field_ID = session$userData$currentShape
+    dbExecute(conn, "DELETE from Field where Field_ID = ?",
+              params = list(Field_ID))
+    leafletProxy("map") %>% removeShape(Field_ID)
+    removeUI("#currentField")
   })
   
   output$downloadData <- downloadHandler(
@@ -218,19 +247,20 @@ server = function(input, output, session){
       export = dbConnect(RSQLite::SQLite(), file)
       RSQLite::sqliteCopyDatabase(session$userData$conn, export)
     })
-  observe({
+  
+  observeEvent(input$openData, {
     # when the user upload a sqlite database
-    req(input$openData)
-    # remember its path and name
     datapath = input$openData$datapath
     newbase = dbConnect(RSQLite::SQLite(), datapath)
     dbDisconnect(session$userData$conn)
     session$userData$conn = dbConnect(RSQLite::SQLite(), ":memory:")
     RSQLite::sqliteCopyDatabase(newbase, session$userData$conn)
+    Init_database(session$userData$conn)
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% clearMarkers() %>% clearShapes() %>% 
       create_layer(newShape) %>%
       create_layerControl(unique(newShape$Zone_Name))
+    isolate(refreshPlot(!refreshPlot()))
   })
   
   output$map = renderLeaflet({
@@ -238,6 +268,15 @@ server = function(input, output, session){
     map = create_map() %>% 
       create_layerControl()
     return(map)
+  })
+  
+  output$DOY_GRAPH = renderPlot({
+    a = refreshPlot()
+    graph = drawErosion(
+      session$userData$conn,
+      date_limits =c(input$DatesMerge[1], input$DatesMerge[2])
+    )
+    return(graph)
   })
   
 }
