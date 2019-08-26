@@ -7,23 +7,18 @@ library(sf)
 source("Utils.R")
 
 MODIS.MODEL = "/home/luxis/Dropbox/MODIS/MOD09Q1_NDVI_2010_001.tif"
-
+PHASE.FILES = list.files("/home/luxis/Dropbox/Kuhn/phenology/PhenoWin1/_DOY",
+                         "\\.tif$", full.names = TRUE)
+MODIS.FILES = list.files("/home/luxis/Dropbox/MODIS",
+                         "_NDVI_.*\\.tif$", full.names = TRUE)
+PRECI.FILES = list.files("/home/luxis/Dropbox/RadolanIndex",
+                         "\\.asc$", full.names = TRUE)
 
 PRECI.CRS=CRS("+init=epsg:31467")
 P_limits = c(10, 24)
 
-
-
-Crop_sf = function(MRaster, SF){
-  boxField =  st_bbox(SF)
-  extentField = extent(boxField$xmin, boxField$xmax,
-                       boxField$ymin, boxField$ymax)
-  ModelRaster = crop(MRaster, extentField, snap="out")
-  return(ModelRaster)
-}
-
-Init_database = function(base_path, init_sql = "Init_Database.sql"){
-  conn = dbConnect(RSQLite::SQLite(), base_path)
+Init_database = function(conn, init_sql = "Init_Database.sql"){
+  
   sql_init = read_file(init_sql)
   sql_list = str_split(sql_init, ";", simplify=TRUE)
   for(i in 1:(length(sql_list)-1)){#last instruction is just a space
@@ -48,7 +43,6 @@ Import_Zone = function(conn, field, Zone_name = "",
   ModelRaster = Crop_sf(MRaster, reproField)
   Zone_ID = Save_RasterID(conn, ModelRaster)
   FieldID$Zone_ID = Zone_ID
-  ZZ <<- FieldID
   #### Create weightings
   RasterID = Load_RasterID(conn, Zone_ID)
   # split each cell into 100 pieces to calculate the weight
@@ -98,10 +92,14 @@ Import_Culture = function(conn, Zone_ID, culture){
   dbAppendTable(conn, "Culture", culture4database)
 }
 
-Import_Phase = function(conn, PHASE.FILES){
-  CulturePosition = tbl(conn, "CulturePosition") %>% 
-    dplyr::select(-Field_ID) %>% 
+Import_Phase = function(conn, Field_id = NA){
+  culposquery = tbl(conn, "CulturePosition")
+  if(!is.na(Field_id)){
+    culposquery = filter(culposquery, Field_ID%in%Field_id)
+  }
+  CulturePosition = culposquery %>% 
     collect() %>% 
+    dplyr::select(-Field_ID) %>% 
     gather("limit", "exist", -Position_ID,
            -Crop, -Declaration, -Culture_ID) %>% 
     filter(is.na(exist)) %>% 
@@ -117,6 +115,9 @@ Import_Phase = function(conn, PHASE.FILES){
       year1 = year(Declaration),
       year2 = year(Declaration) + direct
       )
+  print(CulturePosition)
+  if(!nrow(CulturePosition)){return(NULL)}
+  print("NULLL")
   Crops = CulturePosition %>% 
     dplyr::select( Crop, year1, year2) %>% 
     gather("name", "Year", -Crop) %>%
@@ -144,6 +145,7 @@ Import_Phase = function(conn, PHASE.FILES){
     dplyr::transmute(P, Culture_ID, Transition =as.character(Transition))
   dbWriteTable(conn, "Phase", Limits4database, append=TRUE)
   
+  # Load the other phases
   Phase4database = tbl(conn, "CulturePosition") %>% 
     dplyr::select(-Field_ID) %>% 
     collect() %>% drop_na() %>% 
@@ -159,7 +161,8 @@ Import_Phase = function(conn, PHASE.FILES){
   dbWriteTable(conn, "Phase", Phase4database, append=TRUE)
 }
 
-Import_Measure = function(conn, MODIS.FILES, PRECI.FILES, field_id = NA){
+Import_Measure = function(conn, field_id = NA, progress=NA){
+  # progress : function with number between 0 and 1 
   
   culQuery = tbl(conn, "CulturePosition")
   if(!is.na(field_id)){culQuery = filter(culQuery, Field_ID==field_id)}
@@ -177,7 +180,9 @@ Import_Measure = function(conn, MODIS.FILES, PRECI.FILES, field_id = NA){
   Ldates = distinct(Minfo, Date) %>% pull(Date)
   pb <- txtProgressBar(min=0, max=length(Ldates), style=3) 
   for(CurDate in Ldates){
-    setTxtProgressBar(pb, getTxtProgressBar(pb)+1)
+    prog = getTxtProgressBar(pb)+1
+    progress(prog/length(Ldates))
+    setTxtProgressBar(pb, prog)
     cul = cultures %>% 
       filter((Beginning <= CurDate) & (Ending >= CurDate))
     if(!nrow(cul)){next}

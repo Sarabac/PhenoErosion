@@ -15,8 +15,8 @@ GERMANY = file.path("Zones/DEU_adm0.shp") #border of germany
 # Access the phenological data of the Crop "n", ready for the graph
 LEAFLET_CRS = sf::st_crs(4326)
 
-### Colors corresponding to each phenological stage
-phasesCode = read.csv("Phases.csv") %>% arrange(Code)
+# separation of the rows in the attribut table of the fields
+ROW_SEPARATION = "(;|,)"
 
 # Corespondance between the name of the crop and its number
 CROPS_CORRESPONDANCE = list(
@@ -82,57 +82,7 @@ create_feature = function(feature){
   return(geom_set)
 }
 
-build_DOY_graph = function(dat, date_breaks=waiver(),
-                           user_facet=facet_grid(Area~Crop)){
-  # create the Phenological graph from the data frame "dat" with attributs:
-  #     "Date": class Date
-  #     "sum_weight": between 0 and 1, proportion of pixels in phase P
-  #     "P": phenological stage
-  #     "Area": spatial entities ID
-  #     "Crop": the crop ID
-  # date_breaks: character
-  fphasesCode = filter(phasesCode, Code%in%dat$P)
-  color_fill_rule = as.vector(fphasesCode$Color)
-  names(color_fill_rule) <- fphasesCode$Code
-  graph =  ggplot(dat, aes(x = Date, y=1, alpha = sum_weight,
-                           fill = as.factor(P)))+
-    geom_tile() + 
-    user_facet+
-    scale_fill_manual(values = color_fill_rule) + # color fill scall of the phenological stages
-    geom_vline(aes(
-          xintercept = as.Date(paste(year(Date),"01", "01", sep="-")),
-          linetype = "Year"), size = 2)+
-    geom_vline(aes(
-          xintercept = as.Date(paste(year(Date), month(Date), "01", sep="-")),
-                   linetype = "Month"))  +
-    labs(fill = "Phenology", alpha = "Weight") +
-    
-    scale_x_date(name="DOY", date_breaks=date_breaks,
-                 labels=scales::date_format("%j"),
-                 sec.axis=dup_axis(
-                   name="Date",labels = scales::date_format("%d %b %Y"))) +
-    scale_linetype_manual("Breaks", 
-                          values = c("Month"="dotted", "Year"="dashed")) +
-    theme(axis.text.x=element_text(angle=30, hjust=1),
-          axis.text.x.top = element_text(angle = 30, vjust=0, hjust=0))
-  return(graph)
-}
 
-period_labelling = function(from, to){
-  # define the date break of the graph
-  # depending of the lenght of the time period
-  dif = ymd(to) - ymd(from)
-  label_period = case_when(
-    dif > 2100 ~ "1 month",
-    dif> 1800 ~ "4 week",
-    dif > 1000 ~ "3 week",
-    dif > 500 ~ "2 week",
-    dif > 200 ~ "1 week",
-    dif > 60 ~ "2 day",
-    TRUE ~ "1 day"
-  )
-  return(label_period)
-}
 is.point = function(geometry){
   sf::st_geometry_type(geometry) %in% c("POINT","MULTIPOINT")
 }
@@ -143,6 +93,7 @@ sf_database = function(conn){
 create_map = function(){
   # origin is a shapefile which extent is the default
   # map extent
+  print("hello")
   map = leaflet() %>%
     fitBounds(4.80,55.53, 16.38,46.87) %>% 
     addDrawToolbar( targetGroup = "created",
@@ -150,8 +101,6 @@ create_map = function(){
                     circleOptions = FALSE,
                     rectangleOptions = FALSE,
                     circleMarkerOptions = FALSE,
-                    polygonOptions = TRUE,
-                    markerOptions = TRUE,
                     singleFeature = TRUE
     ) %>% 
     addSearchOSM() %>% addResetMapButton() %>%
@@ -210,7 +159,8 @@ load4leaflet = function(conn, path, name, varname="",
                         Zone_name = name)
   field = result %>% st_drop_geometry()
   if(varerosion!=""){
-    eroField = dplyr::select(field, Name, Event_Date = !!varerosion)
+    eroField = dplyr::select(field, Name, Event_Date = !!varerosion) %>% 
+      separate_rows(Event_Date, sep = ROW_SEPARATION)
     Import_Erosion(conn, Zone_ID, eroField)
   }
   if(varcrop!=""&vardeclaration!=""){
@@ -218,7 +168,7 @@ load4leaflet = function(conn, path, name, varname="",
   culture = field %>% 
     dplyr::select(Name, Crop=!!varcrop,
            Declaration=!!vardeclaration) %>% 
-    separate_rows(Crop, Declaration, sep="(;|,)")
+    separate_rows(Crop, Declaration, sep=ROW_SEPARATION)
   Import_Culture(conn, Zone_ID, culture)
   }
   return(Zone_ID)
