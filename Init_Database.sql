@@ -19,7 +19,7 @@ create table if not exists Field(
   Zone_ID INTEGER,
   Field_ID INTEGER PRIMARY KEY,
   Name VARCHAR,
-  geometry GEOMETRY,
+  geometry MULTIPOLYGON,
   selected BOOLEAN,
   FOREIGN KEY (Zone_ID) REFERENCES Zone(Zone_ID) ON DELETE CASCADE
 );
@@ -27,8 +27,8 @@ create table if not exists Culture(
   -- culture on a field
   Field_ID INTEGER,
   Culture_ID INTEGER PRIMARY KEY,
-  Declaration VARCHAR, -- date of crop declaration
-  Crop INTEGER,
+  Declaration VARCHAR NOT NULL ON CONFLICT IGNORE, -- date of crop declaration
+  Crop INTEGER NOT NULL ON CONFLICT IGNORE,
   UNIQUE(Field_ID, Declaration) ON CONFLICT IGNORE,
   FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE
 );
@@ -36,8 +36,8 @@ create table if not exists Phase(
   -- Phse of a culture
   Culture_ID INTEGER,
   Phase_ID INTEGER PRIMARY KEY,
-  Transition VARCHAR, -- date of Phase transition
-  P INTEGER, -- Phase code
+  Transition VARCHAR NOT NULL, -- date of Phase transition
+  P INTEGER NOT NULL, -- Phase code
   FOREIGN KEY (Culture_ID) REFERENCES Culture(Culture_ID) ON DELETE CASCADE
 );
 
@@ -52,8 +52,8 @@ create table if not exists Position(
   create table if not exists ErosionEvent(
     -- Erosion happening on a specific field
     Event_ID INTEGER PRIMARY KEY,
-    Field_ID INTEGER, -- field where the erosion occure
-    Event_Date VARCHAR,
+    Field_ID INTEGER NOT NULL ON CONFLICT IGNORE, -- field where the erosion occure
+    Event_Date VARCHAR NOT NULL ON CONFLICT IGNORE,
     UNIQUE(Field_ID, Event_Date) ON CONFLICT IGNORE,
     FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE);
 
@@ -62,7 +62,7 @@ create table if not exists Weighting(
   W_ID INTEGER PRIMARY KEY,
   Position_ID INTEGER,
   Field_ID INTEGER,
-  weight FLOAT,  -- indicate the proportion of the cell covered by the Field
+  weight FLOAT NOT NULL,  -- indicate the proportion of the cell covered by the Field
   UNIQUE(Position_ID, Field_ID) ON CONFLICT IGNORE,
   FOREIGN KEY (Position_ID) REFERENCES Position(Position_ID) ON DELETE CASCADE,
   FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE);
@@ -71,8 +71,8 @@ create table if not exists Measure(
   -- NDVI value in a given cell in a given Date
   M_ID INTEGER PRIMARY KEY,
   Position_ID INTEGER,
-  Date Date,
-  Variable VARCHAR,
+  Date Date NOT NULL,
+  Variable VARCHAR NOT NULL,
   Value FLOAT NOT NULL,
   UNIQUE(Position_ID, Variable, Date) ON CONFLICT IGNORE,
   FOREIGN KEY (Position_ID) REFERENCES Position(Position_ID) ON DELETE CASCADE);

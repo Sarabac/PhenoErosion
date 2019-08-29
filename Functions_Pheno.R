@@ -16,23 +16,13 @@ GERMANY = file.path("Zones/DEU_adm0.shp") #border of germany
 LEAFLET_CRS = sf::st_crs(4326)
 
 # separation of the rows in the attribut table of the fields
-ROW_SEPARATION = "(;|,)"
+ROW_SEPARATION = ";"
+CULTURE_SEPARATION = "[|]"
 
 # Corespondance between the name of the crop and its number
-CROPS_CORRESPONDANCE = list(
-  "Permanent Grassland" = 201,
-  "Winter Wheat" = 202,
-  "Winter Barley" = 204,
-  "Winter Rape" = 205,
-  "Oat" = 208,
-  "Maize" = 215
-)
-
-CROPS_CORRESPONDANCE_FRAME = tibble(
-  Crop = unlist(CROPS_CORRESPONDANCE),
-  Crop_name = names(CROPS_CORRESPONDANCE)
-)
-
+CROPS_CORRESPONDANCE_FRAME = read.csv("crop_correspondance.csv")
+CROPS_CORRESPONDANCE = setNames(CROPS_CORRESPONDANCE_FRAME$Crop,
+                                CROPS_CORRESPONDANCE_FRAME$Crop_name)
 
 extract_n = function(dat, n){
   # extract a number of length n from a character vector
@@ -77,8 +67,8 @@ create_feature = function(feature){
   }else{
     sps = sf::st_point(c(co[[1]],co[[2]]))
   }
-  geom_set = sf::st_sfc(sps, crs=LEAFLET_CRS)
   # assign the WG84 projection
+  geom_set = sf::st_sf(geometry = st_sfc(sps), crs=LEAFLET_CRS)
   return(geom_set)
 }
 
@@ -101,6 +91,7 @@ create_map = function(){
                     circleOptions = FALSE,
                     rectangleOptions = FALSE,
                     circleMarkerOptions = FALSE,
+                    markerOptions = FALSE,
                     singleFeature = TRUE
     ) %>% 
     addSearchOSM() %>% addResetMapButton() %>%
@@ -149,12 +140,19 @@ create_layerControl = function(map, groupNames = c()){
 
 load4leaflet = function(conn, path, name, varname="",
                         varcrop="", vardeclaration="", varerosion=""){
-  polyg=sf::st_transform(sf::read_sf(path),LEAFLET_CRS)
-  if(varname==""){
+  # put the fields in the database
+  # use the data in the field attributs
+  if(is.character(path)){
+    polyg = sf::st_transform(sf::read_sf(path),LEAFLET_CRS)
+  }else{ # if the path is already a sf object
+    polyg = sf::st_transform(path,LEAFLET_CRS)
+  }
+  if(varname==""){ # create a name with the row number
     result = mutate(polyg, Name = row_number())
   }else{
     result = rename(polyg, Name = !!varname)
   }
+  
   Zone_ID = Import_Zone(conn, dplyr::select(result, Name),
                         Zone_name = name)
   field = result %>% st_drop_geometry()
@@ -163,12 +161,13 @@ load4leaflet = function(conn, path, name, varname="",
       separate_rows(Event_Date, sep = ROW_SEPARATION)
     Import_Erosion(conn, Zone_ID, eroField)
   }
-  if(varcrop!=""&vardeclaration!=""){
+  if(varcrop!=""){
     
   culture = field %>% 
-    dplyr::select(Name, Crop=!!varcrop,
-           Declaration=!!vardeclaration) %>% 
-    separate_rows(Crop, Declaration, sep=ROW_SEPARATION)
+    dplyr::select(Name, cultures=!!varcrop) %>% 
+    separate_rows(cultures, sep=ROW_SEPARATION) %>% 
+    separate(cultures, c("Crop", "Declaration"), sep=CULTURE_SEPARATION)
+    
   Import_Culture(conn, Zone_ID, culture)
   }
   return(Zone_ID)
