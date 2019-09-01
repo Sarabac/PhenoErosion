@@ -139,7 +139,7 @@ create_layerControl = function(map, groupNames = c()){
 }
 
 load4leaflet = function(conn, path, name, varname="",
-                        varcrop="", vardeclaration="", varerosion=""){
+                        varcrop="", varerosion=""){
   # put the fields in the database
   # use the data in the field attributs
   if(is.character(path)){

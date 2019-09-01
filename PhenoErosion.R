@@ -72,7 +72,6 @@ server = function(input, output, session){
     showModal(modalDialog(
       radioButtons("varname", "ID Variable", choices=Name),
       radioButtons("varcrop", "Crop Variable", choices=Crop),
-      radioButtons("vardeclaration", "Date Variable", choices=Declaration),
       radioButtons("varerosion", "Erosion Date variable", choices=Erosion),
       footer = tagList(actionButton("ok", "OK")))
     )
@@ -85,7 +84,7 @@ server = function(input, output, session){
                             infos$path,
                             str_remove(infos$name, "\\..*$"),
                             input$varname, input$varcrop,
-                            input$vardeclaration, input$varerosion)
+                           input$varerosion)
     newShape = sf_database(session$userData$conn) # take all the shape
     leafletProxy("map") %>% create_layer(newShape) %>%
       create_layerControl(unique(newShape$Zone_Name))

@@ -50,6 +50,12 @@ getGraphData = function(conn, threshold){
   
   CultureData = tbl(conn, "CultureDate") %>% collect() %>% 
     filter(Field_ID%in%fields) %>% drop_na()
+  totalPeriod = CultureData %>% 
+    group_by(Field_ID) %>% 
+    summarise(Beginning = min(Beginning), Ending = max(Ending)) %>% 
+    group_by(Field_ID) %>% 
+    expand(Date = seq(as.Date(Beginning), as.Date(Ending), by="days")) %>% 
+    ungroup()
   if(!nrow(CultureData)){return(NULL)}
   CultureDate = CultureData %>% 
     group_by(Field_ID, Culture_ID) %>% 
@@ -98,8 +104,8 @@ drawErosion = function(culture, erosion, NDVI, precipitation, date_limits = NULL
   names(color_fill_rule) <- fphasesCode$Code
   #color_fill_rule = c(color_fill_rule, c("Precipitation"="darkblue"))
   
-  graph =  ggplot(data = culture, mapping = aes(x = as.Date(Date), y=NormValue))+
-    geom_tile(mapping =  aes(fill = as.factor(P))) +
+  graph =  ggplot( mapping = aes(x = as.Date(Date), y=NormValue))+
+    geom_tile(data = culture, mapping =  aes(fill = as.factor(P))) +
     geom_vline(data= erosion, mapping =  aes(xintercept = Date, color = "Erosion")) +
     geom_boxplot( aes(group=Date), data = NDVI, outlier.alpha=0) +
     geom_bar(data = precipitation, fill = "darkblue", stat = "identity") +

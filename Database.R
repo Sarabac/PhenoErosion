@@ -167,9 +167,11 @@ Import_Phase = function(conn, Field_id = NA){
 Import_Measure = function(conn, field_id = NA, progress=NA){
   # progress : function with number between 0 and 1 
   
-  culQuery = tbl(conn, "CulturePosition")
-  if(!is.na(field_id)){culQuery = filter(culQuery, Field_ID==field_id)}
-  cultures = collect(culQuery)
+  cultures = tbl(conn, "CultureDate") %>% collect() %>% 
+    group_by(Field_ID) %>% 
+    summarise(Beginning = min(Beginning), Ending = max(Ending)) %>% 
+    inner_join(collect(tbl(conn, "Weighting")), by="Field_ID")
+  if(!is.na(field_id)){cultures = filter(cultures, Field_ID==field_id)}
   
   modis = tibble(dir=MODIS.FILES) %>% 
     mutate(Variable = "NDVI", name = basename(dir))
