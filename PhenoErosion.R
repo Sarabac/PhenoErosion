@@ -7,6 +7,7 @@ setwd(W.DIR)
 source("Functions_Pheno.R")
 source("Database.R")
 source("GraphErosion.R")
+source("UI.R")
 library(tidyverse)
 library(shiny)
 library(leaflet)
@@ -15,7 +16,7 @@ library(lubridate)
 library(tictoc)
 
 # to upload large geojson files
-options(shiny.maxRequestSize=30*1024^2)
+options(shiny.maxRequestSize=1000*1024^2)
 addResourcePath("_Images", "_Images")
 
 # load the border of Germany
@@ -23,108 +24,29 @@ addResourcePath("_Images", "_Images")
 # prevent selecton on the entier Germany
 #shape_init$selected = NA
 
-# the minimal value of the time scale
-minDate = as.Date("1993-01-01")
-# the maximale value of the time scale
-maxDate = as.Date(today() + years(1))
-
-# widgets of the shiny app
-title_div = div(img(src="_Images/EMRA_Logo.svg", width="30px"),
-                "PhenoWin: Visualisation of phenological windows in Germany" )
-ui = fluidPage(
-  tags$head(# css styles
-    tags$style(HTML("
-                    #compute{background-color:GreenYellow }
-                    *{font: bold 12px/30px Arial, serif}
-                    ")),
-    tags$title("PhenoWin"),
-    tags$link(rel="shortcut icon", href="_Images/EMRA_Logo.ico")
-  ),
-  fluidRow(
-    titlePanel(title_div),
-    column(2,
-           actionButton("compute", "Compute", icon = icon("play")),
-           actionButton("deselectAll", "Deselect All")),
-    column(2, fileInput("geofile", "Import Geojson", accept = c(".geojson"))),
-    column(2, downloadButton("downloadData", "Save"),
-           fileInput("openData", "Open") ),
-    column(2, downloadButton("downloadPhase", "Download Phase Code") )),
-  fluidRow(column(8,leafletOutput("map")),column(4,div(id="fieldedit"))),
-  fluidRow(
-             sliderInput("DatesMerge", "Time Periode",
-                         min = minDate,
-                         max = maxDate,
-                         value=c(as.Date("2015-01-01"),as.Date("2018-01-01") ),
-                         timeFormat="%Y-%m-%d", width = "100%")),
-  fluidRow(plotOutput("DOY_GRAPH"))
-  )
-
-editField = function(conn, Field_ID){
-  fbase = tbl(conn, "editField") %>% filter(Field_ID==!!Field_ID)
-  ### Field ###
-  Zone_Name = fbase %>% pull(Zone_Name) %>% unique()
-  Name = fbase %>% pull(Name) %>% unique()
-  saveChoice = setNames(c(Field_ID), c("SAVE") )
-  field = h3(
-    Zone_Name,
-    textInput("editName", NULL, value=Name, width = "25%")
-  )
-  ### Erosion ###
-  erosion = fbase %>% dplyr::select(Event_ID, Event_Date) %>%
-    distinct() %>%  collect()
-  newErosion = dateInput("newErosion", NULL, value = "0000-00-00")
-  if(nrow(drop_na(erosion))){
-    deleteErosion = checkboxGroupInput(
-      "deleteErosion", NULL,
-      choices = setNames(erosion$Event_ID, erosion$Event_Date)
-    )
-    erodiv = div(newErosion, deleteErosion) 
-  }else{
-    erodiv = div(newErosion) 
-  }
-  ### Culture ###
-  culture = fbase %>% dplyr::select(Culture_ID, Declaration, Crop) %>%
-    distinct() %>%  collect() %>% 
-    mutate(display = paste(Crop," (", Declaration, ")", sep=""))
-  newCulture = div(
-    selectInput("CropSelect", "Select Crop", choices = CROPS_CORRESPONDANCE),
-    dateInput("newDeclaration", NULL, value = "0000-00-00")
-    )
-  if(nrow(drop_na(culture))){
-    deleteCulture = checkboxGroupInput(
-      "deleteCulture", NULL,
-      choices = setNames(culture$Culture_ID, culture$display)
-    )
-    culturediv = div(newCulture, deleteCulture) 
-  }else{
-    culturediv = div(newCulture) 
-  }
-  deleteField = actionButton("deleteField", "DELETE", icon = icon("trash"))
-  
-  insertUI(
-    selector = "#fieldedit", where = "afterBegin",
-    ui = div(field, erodiv, culturediv, deleteField, id = "currentField")
-  )
-  
-}
 
 ############### SERVER ############################
+
 server = function(input, output, session){
-  
+  # the connection object to store all the data
   session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:"))
+  # when the user disconnect, remove the database connection
   session$onSessionEnded(function() {
     dbDisconnect(session$userData$conn)
   })
+  # when the user add a new geojson file
   session$userData$currentGeo = list()
+  # last field clicked
   session$userData$currentShape = 0
-  refreshPlot = reactiveVal(TRUE)
   
   observeEvent(input$compute, {
+    # extract the informations from the geotif
+    # when the user click on the "compute" button
     showModal(modalDialog(
       helpText("Loading"),
       footer =NULL))
     Import_Phase(session$userData$conn)
-    progress <- shiny::Progress$new()
+    progress <- shiny::Progress$new() # the progress bar
     # Make sure it closes when we exit this reactive, even if there's an error
     on.exit(progress$close())
     
@@ -132,8 +54,6 @@ server = function(input, output, session){
     Import_Measure(session$userData$conn, progress=progress$set)
     
     removeModal()
-    # refresh plot
-    isolate(refreshPlot(!refreshPlot()))
   })
   
   observeEvent(input$geofile, {
@@ -152,24 +72,34 @@ server = function(input, output, session){
     showModal(modalDialog(
       radioButtons("varname", "ID Variable", choices=Name),
       radioButtons("varcrop", "Crop Variable", choices=Crop),
-      radioButtons("vardeclaration", "Date Variable", choices=Declaration),
       radioButtons("varerosion", "Erosion Date variable", choices=Erosion),
       footer = tagList(actionButton("ok", "OK")))
     )
   })
   
   observeEvent(input$ok,{
-    #When the choice of the IDs is made
+    # When the choice of the IDs, crop, erosion_event is made
     infos = session$userData$currentGeo #retrive the file data
     Zone_ID = load4leaflet(session$userData$conn,
-                            infos$path, #remove the file extension
+                            infos$path,
                             str_remove(infos$name, "\\..*$"),
                             input$varname, input$varcrop,
-                            input$vardeclaration, input$varerosion)
+                           input$varerosion)
+    newShape = sf_database(session$userData$conn) # take all the shape
+    leafletProxy("map") %>% create_layer(newShape) %>%
+      create_layerControl(unique(newShape$Zone_Name))
+    removeModal() # remove the form to choose ID, crop, Erosion event date
+  })
+  
+  observeEvent(input$map_draw_new_feature, {
+    # when the user use the drawing tool
+    drawing_infos = input$map_draw_new_feature
+    newF = create_feature(drawing_infos) # geometry object
+    Zone_ID = load4leaflet(session$userData$conn,
+                           newF, "Custom")
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% create_layer(newShape) %>%
       create_layerControl(unique(newShape$Zone_Name))
-    removeModal()
   })
   
   observe({on_click(input$map_shape_click[["id"]])})   #for polygons   
@@ -178,7 +108,7 @@ server = function(input, output, session){
     # function called when a feature is clicked
     if(is.null(clickID)){return(NULL)}
     session$userData$currentShape = clickID
-    dbExecute(
+    dbExecute( # update the "selected" attribut of the clicked field
       session$userData$conn,
       "UPDATE Field set selected=NOT(selected) where Field_ID=?",
       params = list(clickID)
@@ -186,25 +116,27 @@ server = function(input, output, session){
     leafletProxy("map") %>% 
       create_layer(filter(sf_database(session$userData$conn),
                           Field_ID == clickID))
+    # update the field editor with the current field
     removeUI("#currentField")
     editField(session$userData$conn, clickID)
-    isolate(refreshPlot(!refreshPlot()))
   }
   
-  observe({
+  observe({ # when the user edit the field
     Name = input$editName
     conn = session$userData$conn
     Field_ID = session$userData$currentShape
     print(Field_ID)
     if(Field_ID==0){return(NULL)}
-    
+    # update field name
     dbExecute(conn, "UPDATE Field set Name=? where Field_ID=?",
               param = list(Name, Field_ID))
+    # remove selected erosion events
     erodelete = input$deleteErosion
     lapply(erodelete, function(eroID){
       dbExecute(conn, "DELETE FROM ErosionEvent where Event_ID = ?",
                 param = list(eroID))
     })
+    # add created erosion event
     erodate = input$newErosion
     if(length(erodate)){
       dbWriteTable(conn, "ErosionEvent",tibble(
@@ -212,13 +144,15 @@ server = function(input, output, session){
         Event_Date = as.character(erodate)
       ), append = TRUE)
     }
+    # remove selected culture
     culturedelete = input$deleteCulture
     lapply(culturedelete, function(culID){
       dbExecute(conn, "DELETE FROM Culture where Culture_ID = ?",
                 param = list(culID))
     })
+    # add created culture
     cuturedate = input$newDeclaration
-    cuturecrop = isolate(input$CropSelect)
+    cuturecrop = isolate(input$CropSelect) 
     if(length(cuturedate)){
       dbWriteTable(conn, "Culture",tibble(
         Field_ID = Field_ID,
@@ -226,13 +160,14 @@ server = function(input, output, session){
         Crop = cuturecrop
       ), append = TRUE)
     }
+    # refresh edit panel
     removeUI("#currentField")
     editField(session$userData$conn, Field_ID)
-    # refresh plot
-    isolate(refreshPlot(!refreshPlot()))
   })
   
   observeEvent(input$deleteField, {
+    # if the user click on the deleteField button
+    # in the field panel
     conn = session$userData$conn
     Field_ID = session$userData$currentShape
     dbExecute(conn, "DELETE from Field where Field_ID = ?",
@@ -242,6 +177,7 @@ server = function(input, output, session){
   })
   
   output$downloadData <- downloadHandler(
+    # when the user download th database
     filename = "PhenoErosion.sqlite",
     content = function(file) {
       export = dbConnect(RSQLite::SQLite(), file)
@@ -255,29 +191,43 @@ server = function(input, output, session){
     dbDisconnect(session$userData$conn)
     session$userData$conn = dbConnect(RSQLite::SQLite(), ":memory:")
     RSQLite::sqliteCopyDatabase(newbase, session$userData$conn)
+    dbDisconnect(newbase)
     Init_database(session$userData$conn)
+    # redraw the map
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% clearMarkers() %>% clearShapes() %>% 
       create_layer(newShape) %>%
       create_layerControl(unique(newShape$Zone_Name))
-    isolate(refreshPlot(!refreshPlot()))
   })
   
   output$map = renderLeaflet({
     #initialize the map
-    map = create_map() %>% 
-      create_layerControl()
+    map = create_map() %>% create_layerControl()
     return(map)
   })
   
-  output$DOY_GRAPH = renderPlot({
-    a = refreshPlot()
-    graph = drawErosion(
-      session$userData$conn,
-      date_limits =c(input$DatesMerge[1], input$DatesMerge[2])
-    )
-    return(graph)
+  graphData = eventReactive(input$drawGraph, {
+    return(
+      getGraphData(session$userData$conn, input$threshold)
+      )
   })
+  observe({
+    output$DOY_GRAPH = renderPlot({
+      gdata <<- graphData()
+      lim = input$DatesMerge
+      dat = gdata
+      #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
+      if(is.null(dat)){return(NULL)}
+      graph <<- drawErosion(
+        dat$culture, dat$erosion,
+        filter(dat$NDVI, input$NDVIchoice), 
+        filter(dat$precipitation, Variable==input$preciChoice),
+        date_limits =c(lim[1], lim[2])
+      )
+      return(graph)
+    }, height = input$plotHeight)
+  })
+
   
 }
 

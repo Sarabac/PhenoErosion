@@ -1,0 +1,12 @@
+LPIS_code;PhenoID;German;English;Winter
+113;;;Durum;
+115;202;Winterweizen;Winter Wheat;1
+116;206;Sommerweizen;Summer Wheat;0
+121;203;Winterroggen;Winter Rye;1
+131;204;Wintergerste;Winter Barley;1
+132;207;Sommergerste;Summer Barley;0
+155;;;Tritical;
+171;215;Mais;Corn Maize;0
+311;205;Winterraps;Winter Rape;1
+411;;Mais;Silage Maize;
+620;253;Zucker-Ruebe;Sugar Beets;0

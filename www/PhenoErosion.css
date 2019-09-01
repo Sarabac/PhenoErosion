@@ -1,0 +1,102 @@
+@import url('//fonts.googleapis.com/css?family=Lobster|Cabin:400,700');
+
+*{
+  font: bold 12px/30px Arial, serif
+}
+
+body{
+  padding-top: 270px;
+  z-index: 100
+}
+/* Header */
+.tabheader {
+	position: fixed;
+	top: 50px;
+	width: 100%;
+	background-color: #e7e7e7;
+	padding-top: 20px;
+	padding-bottom: 10px;
+  padding-left: 30px;
+  margin-right: 0px;
+  margin-left: 0px;
+	left: 0;
+	z-index: 105;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabheader .row {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-around;
+}
+
+.leaflet-top, .leaflet-bottom {
+	z-index: 100;
+}
+
+.irs-grid-text {
+	color: #0d4473;
+  font-size: 10px;
+}
+
+#compute{
+  background-color:GreenYellow
+}
+
+
+.navbar-brand{
+  font-family: 'Lobster', cursive;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+
+#preciChoice{
+  width: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#preciChoice .shiny-options-group{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+}
+
+#preciChoice .shiny-options-group .radio {
+	display: inline-block;
+	margin-left: 20px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+#preciChoice label{
+	text-align: center;
+}
+
+
+/* editField */
+#currentField{
+  display: grid;
+  column-gap: 30px;
+}
+
+#deleteField{
+  float: right;
+}
+
+.field {
+	grid-column-start: span 2;
+	grid-row: 1;
+}
+.erosion {
+	grid-column: 1;
+	grid-row: 2;
+}
+
+.culture {
+	grid-column: 2;
+	grid-row: 2;
+}

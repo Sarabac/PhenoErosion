@@ -82,13 +82,16 @@ Import_Culture = function(conn, Zone_ID, culture){
   # Name: name of the field
   # Declaration: declaration date of the culture (yyyy-mm-dd)
   # Crop code
+  culture = mutate(culture, Name = as.character(Name))
   Plimits = c(10,24)
+  print(culture)
   culture4database = tbl(conn, "Field") %>% 
     filter(Zone_ID==!!Zone_ID) %>% 
-    dplyr::select(Field_ID, Name) %>% 
     collect() %>% 
+    transmute(Field_ID, Name = as.character(Name)) %>% 
     inner_join(culture, by="Name") %>% 
     dplyr::select(Field_ID, Declaration, Crop)
+  print("sdsdsd")
   dbAppendTable(conn, "Culture", culture4database)
 }
 
@@ -164,9 +167,11 @@ Import_Phase = function(conn, Field_id = NA){
 Import_Measure = function(conn, field_id = NA, progress=NA){
   # progress : function with number between 0 and 1 
   
-  culQuery = tbl(conn, "CulturePosition")
-  if(!is.na(field_id)){culQuery = filter(culQuery, Field_ID==field_id)}
-  cultures = collect(culQuery)
+  cultures = tbl(conn, "CultureDate") %>% collect() %>% 
+    group_by(Field_ID) %>% 
+    summarise(Beginning = min(Beginning), Ending = max(Ending)) %>% 
+    inner_join(collect(tbl(conn, "Weighting")), by="Field_ID")
+  if(!is.na(field_id)){cultures = filter(cultures, Field_ID==field_id)}
   
   modis = tibble(dir=MODIS.FILES) %>% 
     mutate(Variable = "NDVI", name = basename(dir))
@@ -208,11 +213,12 @@ Import_Measure = function(conn, field_id = NA, progress=NA){
 
 Import_Erosion = function(conn, Zone_ID, erosion){
   # erosion : Name, Event_Date
+  erosion = mutate_all(erosion, as.character) %>% drop_na()
   erosion4database = tbl(conn, "Field") %>% 
     filter(Zone_ID==!!Zone_ID) %>% 
-    dplyr::select(Field_ID, Name) %>% 
     collect() %>% 
-    inner_join(erosion, by="Name") %>% 
+    transmute(Field_ID, Name=as.character(Name)) %>% 
+    left_join(erosion, by="Name") %>% 
     dplyr::select(Field_ID, Event_Date)
   dbAppendTable(conn, "ErosionEvent", erosion4database)
 }
