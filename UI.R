@@ -26,10 +26,11 @@ MAP = fluidPage(
       actionButton("deselectAll", "Deselect All")
     ),
     width = "100%", class = "tabheader"),
-  sidebarLayout(
+  fluidRow( sidebarLayout(
     sidebarPanel(div(id="fieldedit")),
     mainPanel(leafletOutput("map", height = "600px")),
-    position = "right"
+    position = "right"),
+    class="content"
   )
   
 )
@@ -51,7 +52,7 @@ GRAPH = fluidPage(
                        value=c(as.Date("2015-01-01"),as.Date("2018-01-01") ),
                        timeFormat="%Y-%m-%d", width = "100%")),
   width = "100%", class = "tabheader"),
-  fluidRow(plotOutput("DOY_GRAPH"))
+  fluidRow(plotOutput("DOY_GRAPH", height = "auto"), class="content")
   
 )
 
@@ -63,7 +64,6 @@ SAVE = fluidPage(
 
 ui = navbarPage(
   "PhenoErosion", selected = "MAP",
-  position = "fixed-top",
   tags$title("PhenoWin"),
 # tags$link(rel="shortcut icon", href="www/EMRA_Logo.ico"),
   includeCSS("www/PhenoErosion.css"),

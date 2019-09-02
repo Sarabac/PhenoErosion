@@ -83,7 +83,6 @@ sf_database = function(conn){
 create_map = function(){
   # origin is a shapefile which extent is the default
   # map extent
-  print("hello")
   map = leaflet() %>%
     fitBounds(4.80,55.53, 16.38,46.87) %>% 
     addDrawToolbar( targetGroup = "created",
@@ -101,31 +100,43 @@ create_map = function(){
   return(map)
 }
 
-create_layer = function(map, shape){
-  if(!nrow(shape)){return(map)} # no change if nothing to add
-  for(Li in shape$Field_ID){
-    sh = shape %>% filter(Field_ID==Li)
-    color = ifelse(sh$selected, "red", "blue")
-    if (is.point(sh)){
-      map = map %>% removeMarker(sh$Field_ID) %>% 
-        addAwesomeMarkers(icon = awesomeIcons(markerColor=color),
-                          layerId = as.character(sh$Field_ID),
-                          label = as.character(sh$Name),
-                          labelOptions = labelOptions(noHide = T),
-                          group = sh$Zone_Name,
-                          data = sh)
-    }else{
-      map = map %>% removeShape(sh$Field_ID) %>% 
+fill_field = tibble(
+  erosion = c(TRUE, TRUE, FALSE, FALSE),
+  culture = c(TRUE, FALSE, TRUE, FALSE),
+  fill_color = c("blue", "orange", "green", "black")
+)
+
+create_layer = function(map, conn, Field_ID=NULL){
+  if(is.null(Field_ID)){
+    Field_ID = tbl(conn, "Field") %>% pull(Field_ID)
+  } # no change if nothing to add
+  for(Li in Field_ID){
+    sh = st_read(conn, "Field") %>% filter(Field_ID==Li)
+    # the color is depending if the field contain erosion or cultures
+    haveErosion = tbl(conn, "ErosionEvent") %>% 
+      filter(Field_ID==Li) %>% collect() %>% nrow()
+    haveCulture = tbl(conn, "Culture") %>% 
+      filter(Field_ID==Li) %>% collect() %>% nrow()
+    fill_color = fill_field %>%
+      filter(erosion==(haveErosion>0)&culture==(haveCulture>0)) %>% 
+      pull(fill_color)
+    # border color is depending if selected
+    color = ifelse(sh$selected, "red", "black")
+    map = map %>% removeShape(Li) %>% 
         addPolygons(color = color, weight = 1, smoothFactor = 0.5,
-                    opacity = 1.0, fillOpacity = 0.3,
+                    fillColor = fill_color,
+                    opacity = 1.0, fillOpacity = 0.4,
                     layerId = as.character(sh$Field_ID),
                     group = as.character(sh$Zone_Name),
                     data = sh,
                     label = as.character(sh$Name),
-                    labelOptions = labelOptions(noHide = T),
+                    labelOptions = labelOptions(
+                      noHide = T,
+                      style = list(color = color)
+                      ),
                     highlightOptions = highlightOptions(
-                      color = "orange", weight = 3, bringToFront = TRUE))
-    }
+                      color = "orange", weight = 3, bringToFront = TRUE)
+                    )
   }
   return(map)
 }
