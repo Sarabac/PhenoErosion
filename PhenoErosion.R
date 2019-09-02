@@ -73,7 +73,8 @@ server = function(input, output, session){
       radioButtons("varname", "ID Variable", choices=Name),
       radioButtons("varcrop", "Crop Variable", choices=Crop),
       radioButtons("varerosion", "Erosion Date variable", choices=Erosion),
-      footer = tagList(actionButton("ok", "OK")))
+      footer = tagList(actionButton("ok", "OK")),
+      title = "Import Geojson")
     )
   })
   
@@ -86,7 +87,7 @@ server = function(input, output, session){
                             input$varname, input$varcrop,
                            input$varerosion)
     newShape = sf_database(session$userData$conn) # take all the shape
-    leafletProxy("map") %>% create_layer(newShape) %>%
+    leafletProxy("map") %>% create_layer(session$userData$conn) %>%
       create_layerControl(unique(newShape$Zone_Name))
     removeModal() # remove the form to choose ID, crop, Erosion event date
   })
@@ -98,7 +99,7 @@ server = function(input, output, session){
     Zone_ID = load4leaflet(session$userData$conn,
                            newF, "Custom")
     newShape = sf_database(session$userData$conn)
-    leafletProxy("map") %>% create_layer(newShape) %>%
+    leafletProxy("map") %>% create_layer(session$userData$conn) %>%
       create_layerControl(unique(newShape$Zone_Name))
   })
   
@@ -114,8 +115,7 @@ server = function(input, output, session){
       params = list(clickID)
       )
     leafletProxy("map") %>% 
-      create_layer(filter(sf_database(session$userData$conn),
-                          Field_ID == clickID))
+      create_layer(session$userData$conn, clickID)
     # update the field editor with the current field
     removeUI("#currentField")
     editField(session$userData$conn, clickID)
@@ -125,7 +125,6 @@ server = function(input, output, session){
     Name = input$editName
     conn = session$userData$conn
     Field_ID = session$userData$currentShape
-    print(Field_ID)
     if(Field_ID==0){return(NULL)}
     # update field name
     dbExecute(conn, "UPDATE Field set Name=? where Field_ID=?",
@@ -161,6 +160,8 @@ server = function(input, output, session){
       ), append = TRUE)
     }
     # refresh edit panel
+    leafletProxy("map") %>%
+      create_layer(session$userData$conn, Field_ID)
     removeUI("#currentField")
     editField(session$userData$conn, Field_ID)
   })
@@ -196,7 +197,7 @@ server = function(input, output, session){
     # redraw the map
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% clearMarkers() %>% clearShapes() %>% 
-      create_layer(newShape) %>%
+      create_layer(session$userData$conn) %>%
       create_layerControl(unique(newShape$Zone_Name))
   })
   
@@ -213,12 +214,12 @@ server = function(input, output, session){
   })
   observe({
     output$DOY_GRAPH = renderPlot({
-      gdata <<- graphData()
+      gdata = graphData()
       lim = input$DatesMerge
       dat = gdata
       #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
       if(is.null(dat)){return(NULL)}
-      graph <<- drawErosion(
+      graph = drawErosion(
         dat$culture, dat$erosion,
         filter(dat$NDVI, input$NDVIchoice), 
         filter(dat$precipitation, Variable==input$preciChoice),
