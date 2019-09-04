@@ -6,7 +6,9 @@ phasesCode = read.csv("Phases.csv") %>% arrange(Code)
 PRECI.VARIABLES = c("RADOLANGT10MM", "RADOLANMAX", "RADOLANSUM")
 names(PRECI.VARIABLES) = PRECI.VARIABLES
 
-normalize = function(x){(x-min(x))/(max(x)-min(x))}
+normalize = function(x){
+  (x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x, na.rm=TRUE))
+  }
 
 period_labelling = function(from, to){
   # define the date break of the graph
@@ -24,66 +26,74 @@ period_labelling = function(from, to){
   return(label_period)
 }
 
-conn  = dbConnect(RSQLite::SQLite(), "/home/luxis/Dropbox/Kuhn/phenology/PhenoErosion/field_test/PhenoErosion.sqlite")
+selected_fields = function(conn){tbl(conn, "Field") %>% filter(selected) %>% pull(Field_ID)}
 
-getGraphData = function(conn, threshold){
-  fields = tbl(conn, "Field") %>% filter(selected) %>% pull(Field_ID)
-  if(!length(fields)){return(NULL)}
+conn  = dbConnect(RSQLite::SQLite(), "/home/luxis/Dropbox/Kuhn/phenology/PhenoErosion/field_test/PhenoErosion(6).sqlite")
+
+getPhase = function(conn, TPcover = 0, TFcover = 0){
   
-  Measure = collect(tbl(conn, "Measure")) %>%
-    inner_join(collect(tbl(conn, "Weighting")), by="Position_ID") %>%
-    filter(Field_ID%in%fields) %>% 
-    collect()
-  
-  FMeasure = Measure %>% 
-    filter(weight>=threshold) %>% 
-    dplyr::select(-M_ID, -W_ID) 
-  
-  Preci = filter(FMeasure, Variable!="NDVI")%>% 
-    group_by(Variable) %>% 
-    mutate(NormValue = normalize(Value)) %>% 
-    group_by(Field_ID, Date, Variable) %>% 
-    summarise(NormValue = median(NormValue)) %>% 
+  Ph = tbl(conn, "Phase") %>% collect() %>% 
+    filter(Field_ID%in%selected_fields(conn)) %>%
+    rename(Date = Transition) %>% 
+    filter(Pcover>=TPcover) %>% 
+    group_by(Field_ID, Culture_ID, P) %>% 
+    summarise(Date = max(Date)) %>% 
     ungroup()
-  NDVI = filter(FMeasure, Variable=="NDVI") %>% 
-    mutate(NormValue = normalize(Value))
-  
-  CultureData = tbl(conn, "CultureDate") %>% collect() %>% 
-    filter(Field_ID%in%fields) %>% drop_na()
-  totalPeriod = CultureData %>% 
-    group_by(Field_ID) %>% 
-    summarise(Beginning = min(Beginning), Ending = max(Ending)) %>% 
-    group_by(Field_ID) %>% 
-    expand(Date = seq(as.Date(Beginning), as.Date(Ending), by="days")) %>% 
-    ungroup()
-  if(!nrow(CultureData)){return(NULL)}
-  CultureDate = CultureData %>% 
-    group_by(Field_ID, Culture_ID) %>% 
-    expand(Date = seq(as.Date(Beginning), as.Date(Ending), by="days")) %>% 
+    
+  phase = Ph %>% 
+    group_by(Culture_ID) %>% 
+    expand(Date = seq(min(as.Date(Date)), max(as.Date(Date)), by = "days")) %>% 
     ungroup() %>% 
     mutate(Date = as.character(Date)) %>% 
-    # phases
-    left_join(collect(tbl(conn, "Phase")), 
-              by = c("Culture_ID"="Culture_ID", "Date"="Transition")) %>% 
-    dplyr::select(-Phase_ID) %>% 
-    group_by(Field_ID) %>% 
-    arrange(Date, .by_group = TRUE) %>% 
-    fill(P, .direction = "down") %>% 
-    mutate(NormValue = 0.5) %>% # to put the tile in the middle of the graph
-    ungroup()
+    left_join(Ph, by = c("Culture_ID", "Date")) %>% 
+    fill(Field_ID, P) %>% 
+    mutate(NormValue = 0.5)
   
-  erosion = collect(tbl(conn, "ErosionEvent")) %>% 
-    filter(Field_ID%in%fields) %>% 
-    transmute(Field_ID, Date = as.Date(Event_Date))
-  return(list(
-    culture = CultureDate,
-    erosion = erosion,
-    NDVI = NDVI,
-    precipitation = Preci
-  ))
+  return(phase)
 }
 
-drawErosion = function(culture, erosion, NDVI, precipitation, date_limits = NULL){
+getPrecipitation = function(conn, varName = "RADOLANGT10MM",
+                            TPcover = 0, TFcover = 0){
+  precipitation = tbl(conn, "WeightMeasure") %>%
+    filter(VarName == varName) %>%
+    collect() %>% 
+    filter(Field_ID %in% selected_fields(conn)) %>% 
+    filter(Pcover>=TPcover) %>% 
+    group_by(Field_ID, Date) %>% 
+    summarise(Value = max(Value)) %>% 
+    mutate(NormValue = normalize(Value))
+  return(precipitation)
+}
+
+getNDVI = function(conn, TPcover = 0, TFcover = 0){
+  NDVI = tbl(conn, "WeightMeasure") %>%
+    filter(VarName == "NDVI") %>%
+    collect() %>% 
+    filter(Field_ID %in% selected_fields(conn)) %>% 
+    filter(Pcover>=TPcover) %>% 
+    mutate(NormValue = normalize(Value))
+  return(NDVI)
+}
+
+getErosion = function(conn){
+  erosion = tbl(conn, "ErosionEvent") %>% 
+    collect() %>% 
+    filter(Field_ID %in% selected_fields(conn)) %>% 
+    transmute(Field_ID, Date = as.Date(Event_Date))
+  return(erosion)
+}
+
+getCulture = function(conn){
+  culture =  tbl(conn, "Culture") %>% 
+    collect() %>% 
+    filter(Field_ID %in% selected_fields(conn)) %>% 
+    transmute(Field_ID,
+              Crop = cropName(Crop),
+              Date = as.Date(Declaration),
+              NormValue = 1)
+}
+
+drawErosion = function(culture, phase, erosion, NDVI, precipitation, date_limits = NULL){
   # create the Phenological graph from the data frame "dat" with attributs:
   #     "Date": class Date
   #     "sum_weight": between 0 and 1, proportion of pixels in phase P
@@ -91,6 +101,12 @@ drawErosion = function(culture, erosion, NDVI, precipitation, date_limits = NULL
   #     "Area": spatial entities ID
   #     "Crop": the crop ID
   # date_breaks: character
+  culture <<- culture
+  phase <<- phase
+  erosion <<- erosion
+  NDVI <<- NDVI
+  precipitation <<- precipitation
+  date_limits <<- date_limits
 
   if(!is.null(date_limits)){
     date_limits = as.Date(date_limits)
@@ -99,16 +115,18 @@ drawErosion = function(culture, erosion, NDVI, precipitation, date_limits = NULL
     date_breaks = waiver()
   }
   
-  fphasesCode = filter(phasesCode, Code%in%culture$P)
+  fphasesCode = filter(phasesCode, Code%in%phase$P)
   color_fill_rule = as.vector(fphasesCode$Color)
   names(color_fill_rule) <- fphasesCode$Code
   #color_fill_rule = c(color_fill_rule, c("Precipitation"="darkblue"))
   
   graph =  ggplot( mapping = aes(x = as.Date(Date), y=NormValue))+
-    geom_tile(data = culture, mapping =  aes(fill = as.factor(P))) +
-    geom_vline(data= erosion, mapping =  aes(xintercept = Date, color = "Erosion")) +
+    geom_tile(data = phase, mapping =  aes(fill = as.factor(P))) +
+    geom_label(data = culture, aes(label = Crop), vjust = -0.1, size = 4) +
     geom_boxplot( aes(group=Date), data = NDVI, outlier.alpha=0) +
-    geom_bar(data = precipitation, fill = "darkblue", stat = "identity") +
+    geom_bar(data = precipitation, fill = "darkblue", stat = "identity", color="black") +
+    geom_vline(data= erosion, mapping =  aes(xintercept = Date, color = "Erosion"),
+               linetype="dotted", size = 1) +
     facet_grid(Field_ID~.) +
     # color fill scall of the phenological stages
     scale_fill_manual(values = color_fill_rule) + 
@@ -120,6 +138,7 @@ drawErosion = function(culture, erosion, NDVI, precipitation, date_limits = NULL
                  limits = date_limits,
                  sec.axis=dup_axis(
                    name="Date",labels = scales::date_format("%d %b %Y"))) +
+    scale_y_continuous(limits = c(0, 1.25)) +
     theme(axis.text.x=element_text(angle=30, hjust=1),
           axis.text.x.top = element_text(angle = 30, vjust=0, hjust=0))
 

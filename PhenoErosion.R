@@ -10,6 +10,7 @@ source("GraphErosion.R")
 source("UI.R")
 library(tidyverse)
 library(shiny)
+library(shinyWidgets)
 library(leaflet)
 library(leaflet.extras)
 library(lubridate)
@@ -30,10 +31,16 @@ addResourcePath("_Images", "_Images")
 server = function(input, output, session){
   # the connection object to store all the data
   session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:"))
+  conn <<- session$userData$conn
+  # define the content of the variables picker
+  variables <<- tbl(session$userData$conn, "Variable") %>% 
+    inner_join(tbl(session$userData$conn, "DataSource"), by="Source_ID") %>% 
+    collect() %>% group_by(SourceName) %>%
+    summarise(Source = list(setNames(Var_ID, VarName)))
+  Vchoice = setNames(variables$Source, variables$SourceName)
+  updatePickerInput(session, "selectVar", choices = Vchoice)
   # when the user disconnect, remove the database connection
-  session$onSessionEnded(function() {
-    dbDisconnect(session$userData$conn)
-  })
+  #session$onSessionEnded(function() {dbDisconnect(session$userData$conn)})
   # when the user add a new geojson file
   session$userData$currentGeo = list()
   # last field clicked
@@ -42,17 +49,35 @@ server = function(input, output, session){
   observeEvent(input$compute, {
     # extract the informations from the geotif
     # when the user click on the "compute" button
+    var_ID <<- input$selectVar
+    sliderYears <<- input$selectYear
+    Years <<- seq(sliderYears[1], sliderYears[2])
+    field_id = tbl(conn, "Field") %>% 
+      filter(selected) %>% pull(Field_ID)
+    Source_ids = tbl(conn, "Variable") %>% 
+      inner_join(tbl(conn, "DataSource"), by="Source_ID") %>% 
+      filter(Var_ID%in%var_ID) %>% 
+      pull(Source_ID) %>% unique()
+    # if no field or no variable selected
+    if(length(field_id)==0|length(var_ID)==0){return(NULL)}
+    
     showModal(modalDialog(
       helpText("Loading"),
       footer =NULL))
-    Import_Phase(session$userData$conn)
-    progress <- shiny::Progress$new() # the progress bar
+    for(sid in Source_ids){
+      Import_Weight(conn, sid, field_id)
+    }
+    progress <- Progress$new() # the progress bar
     # Make sure it closes when we exit this reactive, even if there's an error
     on.exit(progress$close())
-    
-    progress$set(message = "Extracting data", value = 0)
-    Import_Measure(session$userData$conn, progress=progress$set)
-    
+    for (vid in var_ID){
+      progress$set(value = 0,
+                   message = tbl(conn, "Variable") %>%
+                     filter(Var_ID==vid) %>% pull(VarName)
+                   )
+      Import_Measure(session$userData$conn, vid, field_id,
+                    Years, progresfunc = progress$set)
+    }
     removeModal()
   })
   
@@ -81,14 +106,14 @@ server = function(input, output, session){
   observeEvent(input$ok,{
     # When the choice of the IDs, crop, erosion_event is made
     infos = session$userData$currentGeo #retrive the file data
-    Zone_ID = load4leaflet(session$userData$conn,
+    load4leaflet(session$userData$conn,
                             infos$path,
                             str_remove(infos$name, "\\..*$"),
                             input$varname, input$varcrop,
                            input$varerosion)
     newShape = sf_database(session$userData$conn) # take all the shape
     leafletProxy("map") %>% create_layer(session$userData$conn) %>%
-      create_layerControl(unique(newShape$Zone_Name))
+      create_layerControl(unique(newShape$GroupName))
     removeModal() # remove the form to choose ID, crop, Erosion event date
   })
   
@@ -96,11 +121,10 @@ server = function(input, output, session){
     # when the user use the drawing tool
     drawing_infos = input$map_draw_new_feature
     newF = create_feature(drawing_infos) # geometry object
-    Zone_ID = load4leaflet(session$userData$conn,
-                           newF, "Custom")
+    load4leaflet(session$userData$conn,  newF, "Custom")
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% create_layer(session$userData$conn) %>%
-      create_layerControl(unique(newShape$Zone_Name))
+      create_layerControl(unique(newShape$GroupName))
   })
   
   observe({on_click(input$map_shape_click[["id"]])})   #for polygons   
@@ -198,7 +222,7 @@ server = function(input, output, session){
     newShape = sf_database(session$userData$conn)
     leafletProxy("map") %>% clearMarkers() %>% clearShapes() %>% 
       create_layer(session$userData$conn) %>%
-      create_layerControl(unique(newShape$Zone_Name))
+      create_layerControl(unique(newShape$GroupName))
   })
   
   output$map = renderLeaflet({
@@ -208,21 +232,41 @@ server = function(input, output, session){
   })
   
   graphData = eventReactive(input$drawGraph, {
-    return(
-      getGraphData(session$userData$conn, input$threshold)
-      )
+    return(TRUE)
+    #return(getGraphData(session$userData$conn, input$threshold))
   })
+  SgetCulture = reactive({
+    graphData()
+    return( getCulture(session$userData$conn) )
+  })
+  SgetPhase = reactive({
+    graphData()
+    return( getPhase(session$userData$conn) )
+    })
+  SgetErosion = reactive({
+    graphData()
+    return( getErosion(session$userData$conn) )
+    })
+  SgetPrecipitation = reactive({
+    graphData()
+    return( getPrecipitation(session$userData$conn) )
+    })
+  SgetNDVI = reactive({
+    graphData()
+    return( getNDVI(session$userData$conn) )
+    })
+  
   observe({
     output$DOY_GRAPH = renderPlot({
-      gdata = graphData()
       lim = input$DatesMerge
-      dat = gdata
       #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
-      if(is.null(dat)){return(NULL)}
+      #if(is.null(dat)){return(NULL)}
       graph = drawErosion(
-        dat$culture, dat$erosion,
-        filter(dat$NDVI, input$NDVIchoice), 
-        filter(dat$precipitation, Variable==input$preciChoice),
+        SgetCulture(),
+        SgetPhase(),
+        SgetErosion(),
+        filter(SgetNDVI(), input$NDVIchoice), 
+        SgetPrecipitation(),
         date_limits =c(lim[1], lim[2])
       )
       return(graph)

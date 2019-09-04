@@ -1,5 +1,5 @@
 
-list.of.packages = c("tidyverse", "lubridate", "sf",
+list.of.packages = c("tidyverse", "lubridate", "sf", "shinyWidgets",
                      "raster", "velox", "shiny", "leaflet", "scales", "leaflet.extras", "rgdal")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)){install.packages(new.packages)}
@@ -23,6 +23,15 @@ CULTURE_SEPARATION = "[|]"
 CROPS_CORRESPONDANCE_FRAME = read.csv("crop_correspondance.csv")
 CROPS_CORRESPONDANCE = setNames(CROPS_CORRESPONDANCE_FRAME$Crop,
                                 CROPS_CORRESPONDANCE_FRAME$Crop_name)
+CROPS_CORRESPONDANCE_REV = setNames(CROPS_CORRESPONDANCE_FRAME$Crop_name,
+                                    CROPS_CORRESPONDANCE_FRAME$Crop)
+cropName = function(crop){
+  cr = as.character(crop)
+  as.character(
+    CROPS_CORRESPONDANCE_REV[cr]
+    ) %>% 
+    coalesce(cr)
+}
 
 extract_n = function(dat, n){
   # extract a number of length n from a character vector
@@ -77,8 +86,7 @@ is.point = function(geometry){
   sf::st_geometry_type(geometry) %in% c("POINT","MULTIPOINT")
 }
 sf_database = function(conn){
-  st_read(conn, "Field") %>% 
-    inner_join(collect(tbl(conn, "Zone")), by="Zone_ID")
+  st_read(conn, "Field") 
 }
 create_map = function(){
   # origin is a shapefile which extent is the default
@@ -127,7 +135,7 @@ create_layer = function(map, conn, Field_ID=NULL){
                     fillColor = fill_color,
                     opacity = 1.0, fillOpacity = 0.4,
                     layerId = as.character(sh$Field_ID),
-                    group = as.character(sh$Zone_Name),
+                    group = as.character(sh$GroupName),
                     data = sh,
                     label = as.character(sh$Name),
                     labelOptions = labelOptions(
@@ -163,23 +171,32 @@ load4leaflet = function(conn, path, name, varname="",
   }else{
     result = rename(polyg, Name = !!varname)
   }
+  ccc <<- conn
+  lastID = tbl(ccc, "Field") %>%
+    summarise(m = coalesce(max(Field_ID, na.rm = TRUE), 1)) %>% 
+    pull(m)
+  result = mutate(result, Field_ID = row_number() + lastID )
+  field4database = result %>% 
+    transmute(Field_ID, Name, GroupName = name, selected = FALSE )
+  dbWriteTable(conn, "Field", field4database, append = TRUE)
   
-  Zone_ID = Import_Zone(conn, dplyr::select(result, Name),
-                        Zone_name = name)
   field = result %>% st_drop_geometry()
   if(varerosion!=""){
-    eroField = dplyr::select(field, Name, Event_Date = !!varerosion) %>% 
-      separate_rows(Event_Date, sep = ROW_SEPARATION)
-    Import_Erosion(conn, Zone_ID, eroField)
+    eroField = field %>% 
+      dplyr::select(Field_ID, Event_Date = !!varerosion) %>% 
+      separate_rows(Event_Date, sep = ROW_SEPARATION) %>% 
+      drop_na()
+    dbWriteTable(conn, "ErosionEvent", eroField, append=TRUE)
   }
   if(varcrop!=""){
     
-  culture = field %>% 
-    dplyr::select(Name, cultures=!!varcrop) %>% 
+  culture4database = field %>% 
+    dplyr::select(Field_ID, cultures=!!varcrop) %>% 
     separate_rows(cultures, sep=ROW_SEPARATION) %>% 
-    separate(cultures, c("Crop", "Declaration"), sep=CULTURE_SEPARATION)
-    
-  Import_Culture(conn, Zone_ID, culture)
+    separate(cultures, c("Crop", "Declaration"), sep=CULTURE_SEPARATION) %>% 
+    dplyr::select(Field_ID, Crop, Declaration) %>% 
+    drop_na()
+  dbAppendTable(conn, "Culture", culture4database)
   }
-  return(Zone_ID)
+  return(result$Field_ID)
   }
