@@ -30,7 +30,8 @@ addResourcePath("_Images", "_Images")
 
 server = function(input, output, session){
   # the connection object to store all the data
-  session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:"))
+  session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:",
+                                                  loadable.extensions = TRUE))
   conn <<- session$userData$conn
   # define the content of the variables picker
   variables <<- tbl(session$userData$conn, "Variable") %>% 

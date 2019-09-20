@@ -34,11 +34,11 @@ PHASE.INFO = tibble(
   
 RASTERINFO = tibble(
   VarName = c(
-    "NDVI", "RADOLANGT10MM", "RADOLANMAX", "RADOLANSUM"
+    #"NDVI", 
+    "RADOLANGT10MM", "RADOLANMAX", "RADOLANSUM"
   ),
   sources = list(
-    c(list.files("/home/luxis/Dropbox/MODIS",
-                 "_NDVI_.*\\.tif$", full.names = TRUE)),
+    #c(list.files("/home/luxis/Dropbox/MODIS","_NDVI_.*\\.tif$", full.names = TRUE)),
     c(list.files("/home/luxis/Dropbox/RadolanIndex",
                  "RADOLANGT10MM.*\\.asc$", full.names = TRUE)),
     c(list.files("/home/luxis/Dropbox/RadolanIndex",
@@ -46,7 +46,8 @@ RASTERINFO = tibble(
     c(list.files("/home/luxis/Dropbox/RadolanIndex",
                  "RADOLANSUM.*\\.asc$", full.names = TRUE))
   ),
-  SourceName = c("MODIS", "PRECIPITATION", "PRECIPITATION", "PRECIPITATION")
+  SourceName = c(#"MODIS", 
+                 "PRECIPITATION", "PRECIPITATION", "PRECIPITATION")
 ) %>% bind_rows(PHASE.INFO) 
 
 ### automatique
@@ -86,12 +87,14 @@ for(i in 1:nrow(RASTERSOURCES)){
 }
 
 Init_database = function(conn, init_sql = "Init_Database.sql"){
-  
+  cc <<- conn
   sql_init = read_file(init_sql)
   sql_list = str_split(sql_init, ";", simplify=TRUE)
   for(i in 1:(length(sql_list)-1)){#last instruction is just a space
     dbExecute(conn, sql_list[i])
   }
+  #if (!("geometry" %in% dbGetQuery(conn, "PRAGMA table_info(Field)")$name))
+  #{dbExecute(conn, "SELECT AddGeometryColumn('Field', 'geometry',4326, 'POLYGON', 'XY')")}
   # add the definition of empty raster data source
   dbWriteTable(conn, "DataSource", DATASOURCES, append=TRUE)
   # write the names of the corresponding variables

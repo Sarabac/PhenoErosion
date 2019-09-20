@@ -53,7 +53,7 @@ GRAPH = fluidPage(
                   min = 100, max = 2000, value = 500),
       sliderInput("threshold", "Threshold",
                   min = 0, max = 1, value = 0.40, step = 0.01),
-      checkboxInput("NDVIchoice", "Include NDVI", value = TRUE),
+      #checkboxInput("NDVIchoice", "Include NDVI", value = TRUE),
       radioButtons("preciChoice", "Precipitation Variable", choices= PRECI.VARIABLES)
     ),
     fluidRow(sliderInput("DatesMerge",NULL,
@@ -77,7 +77,7 @@ ui = navbarPage(
   tags$title("PhenoWin"),
 # tags$link(rel="shortcut icon", href="www/EMRA_Logo.ico"),
   includeCSS("www/PhenoErosion.css"),
-  includeScript("www/PhenoErosion.js"),
+#  includeScript("www/PhenoErosion.js"),
   tabPanel("MAP", MAP),
   tabPanel("GRAPH", GRAPH),
   tabPanel("SAVE", SAVE),

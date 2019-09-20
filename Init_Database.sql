@@ -1,3 +1,7 @@
+-- init spatialite
+--SELECT load_extension('mod_spatialite')
+--SELECT InitSpatialMetaData()
+
 PRAGMA foreign_keys=ON;
 
 create table if not exists DataSource(
@@ -30,9 +34,12 @@ create table if not exists Field(
   Field_ID INTEGER PRIMARY KEY,
   GroupName VARCHAR,
   Name VARCHAR,
-  geometry MULTIPOLYGON,
-  selected BOOLEAN
+  geometry POLYGON,
+  selected BOOLEAN default 0
 );
+
+
+
 create table if not exists Culture(
   -- culture on a field
   Field_ID INTEGER,
