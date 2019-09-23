@@ -125,8 +125,7 @@ drawErosion = function(culture, phase, erosion, NDVI, precipitation, date_limits
     geom_label(data = culture, aes(label = Crop), vjust = -0.1, size = 4) +
     geom_boxplot( aes(group=Date), data = NDVI, outlier.alpha=0) +
     geom_bar(data = precipitation, fill = "darkblue", stat = "identity", color="black") +
-    geom_vline(data= erosion, mapping =  aes(xintercept = Date, color = "Erosion"),
-               linetype="dotted", size = 1) +
+
     facet_grid(Field_ID~.) +
     # color fill scall of the phenological stages
     scale_fill_manual(values = color_fill_rule) + 
@@ -135,12 +134,18 @@ drawErosion = function(culture, phase, erosion, NDVI, precipitation, date_limits
     scale_x_date(name="DOY",
                  date_breaks=date_breaks,
                  labels=scales::date_format("%j"),
-                 limits = date_limits,
+                 #limits = date_limits,
                  sec.axis=dup_axis(
                    name="Date",labels = scales::date_format("%d %b %Y"))) +
     scale_y_continuous(limits = c(0, 1.25)) +
     theme(axis.text.x=element_text(angle=30, hjust=1),
           axis.text.x.top = element_text(angle = 30, vjust=0, hjust=0))
+  
+  if(nrow(erosion)){
+    graph = graph + 
+      geom_vline(data= erosion, mapping = aes(xintercept = Date, color = "Erosion"),
+                 linetype="dotted", size = 1) 
+  }
 
   return(graph)
 }

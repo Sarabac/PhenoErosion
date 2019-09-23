@@ -4,17 +4,14 @@ library(raster)
 library(lubridate)
 library(velox)
 library(sf)
-library(tictoc)
 source("Utils.R")
 source("Functions_Pheno.R")
 
-extract_n = function(dat, n){
-  # extract a number of length n from a character vector
-  as.integer(str_extract(dat, paste("(?:(?<!\\d)\\d{",n,"}(?!\\d))", sep="")))
-}
-
+# the CRS of the precipitation Data
 PRECI.CRS=CRS("+init=epsg:31467")
 P_limits = c(10, 24)
+
+#### Have to be changed if you want to include new data sources ###
 
 SOURCES.CRS = tibble(
   SourceName = c("PHASE", "MODIS", "PRECIPITATION"),
@@ -27,7 +24,7 @@ PHASE.INFO = tibble(
                      "\\.tif$", full.names = TRUE)
   ) %>% mutate(name = basename(files),
   # Varname format Crop_xxx with xxx the crop code
-         VarName = paste("Crop", extract_n(name, 3), sep="_")) %>% 
+         VarName = as.character(extract_n(name, 3))) %>% 
   group_by(VarName) %>% 
   summarise(sources = list(files)) %>% 
   mutate(SourceName = "PHASE")
@@ -48,7 +45,9 @@ RASTERINFO = tibble(
   ),
   SourceName = c(#"MODIS", 
                  "PRECIPITATION", "PRECIPITATION", "PRECIPITATION")
-) %>% bind_rows(PHASE.INFO) 
+) %>% 
+  # the column are the same with Phase Info
+  bind_rows(PHASE.INFO) 
 
 ### automatique
 
@@ -58,6 +57,7 @@ DATARASTER = unnest(RASTERINFO) %>%
          S_ID = row_number()) %>% 
   inner_join(SOURCES.CRS, by="SourceName")
 
+# generate the model raster for each data source
 RASTERSOURCES = RASTERINFO %>% 
   group_by(SourceName) %>% 
   summarise(model = sources[[1]][1]) %>% 
@@ -67,6 +67,7 @@ RASTERSOURCES = RASTERINFO %>%
 DATASOURCES = NULL
 for(i in 1:nrow(RASTERSOURCES)){
   ModelRaster = raster(RASTERSOURCES$model[[i]])
+  # if the model raster have no CRS
   if(!is.null(RASTERSOURCES$crs[[i]])){
     crs(ModelRaster) = RASTERSOURCES$crs[[i]]
   }
@@ -87,14 +88,17 @@ for(i in 1:nrow(RASTERSOURCES)){
 }
 
 Init_database = function(conn, init_sql = "Init_Database.sql"){
-  cc <<- conn
+  dbWriteTable(conn, "Crop", CROPS_CORRESPONDANCE_FRAME,
+               overwrite = TRUE)
+  dbWriteTable(conn, "PhaseCode", phasesCode, overwrite = TRUE)
   sql_init = read_file(init_sql)
   sql_list = str_split(sql_init, ";", simplify=TRUE)
   for(i in 1:(length(sql_list)-1)){#last instruction is just a space
     dbExecute(conn, sql_list[i])
   }
-  #if (!("geometry" %in% dbGetQuery(conn, "PRAGMA table_info(Field)")$name))
-  #{dbExecute(conn, "SELECT AddGeometryColumn('Field', 'geometry',4326, 'POLYGON', 'XY')")}
+  # Don't know how to create a spatialite database
+  # if (!("geometry" %in% dbGetQuery(conn, "PRAGMA table_info(Field)")$name))
+  # {dbExecute(conn, "SELECT AddGeometryColumn('Field', 'geometry',4326, 'POLYGON', 'XY')")}
   # add the definition of empty raster data source
   dbWriteTable(conn, "DataSource", DATASOURCES, append=TRUE)
   # write the names of the corresponding variables

@@ -131,7 +131,7 @@ create_layer = function(map, conn, Field_ID=NULL){
     # border color is depending if selected
     color = ifelse(sh$selected, "red", "black")
     map = map %>% removeShape(Li) %>% 
-        addPolygons(color = color, weight = 1, smoothFactor = 0.5,
+        addPolygons(color = color, weight = 5, smoothFactor = 0.5,
                     fillColor = fill_color,
                     opacity = 1.0, fillOpacity = 0.4,
                     layerId = as.character(sh$Field_ID),
@@ -166,20 +166,19 @@ load4leaflet = function(conn, path, name, varname="",
   }else{ # if the path is already a sf object
     polyg = sf::st_transform(path,LEAFLET_CRS)
   }
-  if(varname==""){ # create a name with the row number
-    result = mutate(polyg, Name = row_number())
-  }else{
-    result = rename(polyg, Name = !!varname)
-  }
-  ccc <<- conn
-  lastID = tbl(ccc, "Field") %>%
+  lastID = tbl(conn, "Field") %>%
     summarise(m = coalesce(max(Field_ID, na.rm = TRUE), 1)) %>% 
     pull(m)
-  result = mutate(result, Field_ID = row_number() + lastID )
+  named = mutate(polyg, Field_ID = as.integer(row_number() + lastID) )
+  if(varname==""){ # create a name with the row number
+    result = mutate(named, Name = Field_ID)
+  }else{
+    result = rename(named, Name = !!varname)
+  }
   field4database = result %>% 
     transmute(Field_ID, Name, GroupName = name, selected = FALSE )
   dbWriteTable(conn, "Field", field4database, append = TRUE)
-  
+  # write the erosion Field
   field = result %>% st_drop_geometry()
   if(varerosion!=""){
     eroField = field %>% 
@@ -188,8 +187,8 @@ load4leaflet = function(conn, path, name, varname="",
       drop_na()
     dbWriteTable(conn, "ErosionEvent", eroField, append=TRUE)
   }
+  # Write the crop field
   if(varcrop!=""){
-    
   culture4database = field %>% 
     dplyr::select(Field_ID, cultures=!!varcrop) %>% 
     separate_rows(cultures, sep=ROW_SEPARATION) %>% 

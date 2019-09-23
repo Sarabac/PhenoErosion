@@ -88,6 +88,8 @@ create table if not exists Measure(
   UNIQUE(Position_ID, Var_ID, Date) ON CONFLICT IGNORE,
   FOREIGN KEY (Var_ID) REFERENCES Variable(Var_ID) ON DELETE CASCADE
   FOREIGN KEY (Position_ID) REFERENCES Position(Position_ID) ON DELETE CASCADE);
+  
+
 
 Drop view IF EXISTS variableONfield;
 CREATE VIEW IF NOT EXISTS variableONfield
