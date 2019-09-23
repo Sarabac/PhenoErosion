@@ -154,7 +154,7 @@ FROM
     (Select w.Field_ID, Culture_ID, w.VarName, MAX(DATE) AS Date, Declaration
     FROM WeightMeasure w
     INNER JOIN Culture c ON w.Field_ID=c.Field_ID
-    WHERE w.VarName == 'Crop_' || c.Crop
+    WHERE w.VarName == c.Crop
     AND w.Value == 10
     AND julianday(Date) < julianday(Declaration)
     GROUP BY Culture_ID) c
@@ -179,7 +179,7 @@ FROM
     (Select w.Field_ID, Culture_ID, w.VarName, MIN(DATE) AS Date, Declaration
     FROM WeightMeasure w
     INNER JOIN Culture c ON w.Field_ID=c.Field_ID
-    WHERE w.VarName == 'Crop_' || c.Crop
+    WHERE w.VarName == c.Crop
     AND w.Value == 24 -- last phase
     AND julianday(Date) > julianday(Declaration)
     GROUP BY Culture_ID) c

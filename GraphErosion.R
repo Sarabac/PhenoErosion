@@ -32,7 +32,7 @@ conn  = dbConnect(RSQLite::SQLite(), "/home/luxis/Dropbox/Kuhn/phenology/PhenoEr
 
 getPhase = function(conn, TPcover = 0, TFcover = 0){
   
-  Ph = tbl(conn, "Phase") %>% collect() %>% 
+  Ph <<- tbl(conn, "Phase") %>% collect() %>% 
     filter(Field_ID%in%selected_fields(conn)) %>%
     rename(Date = Transition) %>% 
     filter(Pcover>=TPcover) %>% 
@@ -134,7 +134,7 @@ drawErosion = function(culture, phase, erosion, NDVI, precipitation, date_limits
     scale_x_date(name="DOY",
                  date_breaks=date_breaks,
                  labels=scales::date_format("%j"),
-                 #limits = date_limits,
+                 limits = date_limits,
                  sec.axis=dup_axis(
                    name="Date",labels = scales::date_format("%d %b %Y"))) +
     scale_y_continuous(limits = c(0, 1.25)) +
