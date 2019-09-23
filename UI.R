@@ -1,7 +1,5 @@
-
-
 library(shiny)
-#library(shinydashboard)
+library(shinyWidgets)
 library(leaflet)
 library(lubridate)
 
@@ -18,12 +16,24 @@ helpMenu = fluidPage(
 MAP = fluidPage(
   fluidRow(
     fluidRow(
+      fluidRow(
+        actionButton("deselectAll", "Deselect All"),
+        actionButton("selectAll", "select All")
+      ),
       fileInput("geofile", "Import Geojson", accept = c(".geojson")),
-      fileInput("openData", "Open") 
+      fileInput("openData", "Open")
     ),
     fluidRow(
-      actionButton("compute", "Compute", icon = icon("play")),
-      actionButton("deselectAll", "Deselect All")
+      pickerInput(
+        inputId = "selectVar",
+        label = "Select Variable",
+        choices=list("var"=1),
+        multiple = TRUE,
+        options = list(`actions-box` = TRUE)
+      ),
+      sliderInput("selectYear", "Select Year",
+                  min = 2000, max = 2020, value = c(2010, 2012)),
+      actionButton("compute", "Compute", icon = icon("play"))
     ),
     width = "100%", class = "tabheader"),
   fluidRow( sidebarLayout(
@@ -43,7 +53,7 @@ GRAPH = fluidPage(
                   min = 100, max = 2000, value = 500),
       sliderInput("threshold", "Threshold",
                   min = 0, max = 1, value = 0.40, step = 0.01),
-      checkboxInput("NDVIchoice", "Include NDVI", value = TRUE),
+      #checkboxInput("NDVIchoice", "Include NDVI", value = TRUE),
       radioButtons("preciChoice", "Precipitation Variable", choices= PRECI.VARIABLES)
     ),
     fluidRow(sliderInput("DatesMerge",NULL,
@@ -67,7 +77,7 @@ ui = navbarPage(
   tags$title("PhenoWin"),
 # tags$link(rel="shortcut icon", href="www/EMRA_Logo.ico"),
   includeCSS("www/PhenoErosion.css"),
-  includeScript("www/PhenoErosion.js"),
+#  includeScript("www/PhenoErosion.js"),
   tabPanel("MAP", MAP),
   tabPanel("GRAPH", GRAPH),
   tabPanel("SAVE", SAVE),
@@ -90,7 +100,7 @@ title_div = div(img(src="_Images/EMRA_Logo.svg", width="30px"),
 editField = function(conn, Field_ID){
   fbase = tbl(conn, "editField") %>% filter(Field_ID==!!Field_ID)
   ### Field ###
-  Zone_Name = fbase %>% pull(Zone_Name) %>% unique()
+  Zone_Name = fbase %>% pull(GroupName) %>% unique()
   Name = fbase %>% pull(Name) %>% unique()
   field = h3( # zone containing name aof the field
     actionButton("deleteField", "DELETE", icon = icon("trash")),
@@ -132,7 +142,7 @@ editField = function(conn, Field_ID){
     culturediv = div(newCulture) 
   }
    
-  # drae the panel
+  # draw the panel
   insertUI(
     selector = "#fieldedit", where = "afterBegin",
     ui = div(field, erodiv, culturediv, id = "currentField")

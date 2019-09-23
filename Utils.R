@@ -29,23 +29,20 @@ Save_RasterID = function(conn, ModelRaster){
   return(Zone_ID)
 }
 
-Load_RasterID = function(conn, Zone_ID){
-  # Create a raster from the raster designed by Zone_ID in the Zone Table
+Load_RasterID = function(conn, Source_ID){
+  # Create a raster from the raster designed by Source_ID in the DataSource Table
   # values of the cells are the cell index
-  Rtable = dbGetQuery(
-    conn,"Select * from Zone where Zone_ID=?", param=Zone_ID)
+  Rtable =tbl(conn, "DataSource") %>%
+    filter(Source_ID==!!Source_ID) %>% collect()
   Rext = extent(Rtable$xmin, Rtable$xmax, Rtable$ymin, Rtable$ymax)
   EmptyRaster = raster(Rext, Rtable$nrow,
                        Rtable$ncol, CRS(Rtable$CRS))
   RasterID = setValues(EmptyRaster, 1:(Rtable$nrow*Rtable$ncol))
-  names(RasterID)=Rtable$Name
+  names(RasterID)=Rtable$SourceName
   return(RasterID)
 }
 
-extract_n = function(dat, n){
-  # extract a number of length n from a character vector
-  as.integer(str_extract(dat, paste("(?:(?<!\\d)\\d{",n,"}(?!\\d))", sep="")))
-}
+
 
 extract_date = function(dat){
   # turn Year and DOY into a character date
