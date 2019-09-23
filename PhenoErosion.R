@@ -37,8 +37,7 @@ server = function(input, output, session){
                                                   loadable.extensions = TRUE))
   conn <<- session$userData$conn
   # define the content of the variables picker
-  variables <<- tbl(session$userData$conn, "Variable") %>% 
-    inner_join(tbl(session$userData$conn, "DataSource"), by="Source_ID") %>% 
+  variables <<- tbl(session$userData$conn, "variableCrop") %>% 
     collect() %>% group_by(SourceName) %>%
     summarise(Source = list(setNames(Var_ID, VarName)))
   Vchoice = setNames(variables$Source, variables$SourceName)

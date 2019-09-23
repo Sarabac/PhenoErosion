@@ -89,7 +89,14 @@ create table if not exists Measure(
   FOREIGN KEY (Var_ID) REFERENCES Variable(Var_ID) ON DELETE CASCADE
   FOREIGN KEY (Position_ID) REFERENCES Position(Position_ID) ON DELETE CASCADE);
   
-
+Drop view IF EXISTS variableCrop;
+CREATE VIEW IF NOT EXISTS variableCrop
+AS
+SELECT Var_ID, coalesce(c.Crop_name, v.VarName) AS VarName,
+v.Source_ID, c.Crop AS crop_code, d.SourceName
+FROM Variable v
+INNER JOIN DataSource d ON v.Source_ID = d.Source_ID
+LEFT JOIN Crop c ON v.VarName = c.Crop AND d.SourceName = "PHASE";
 
 Drop view IF EXISTS variableONfield;
 CREATE VIEW IF NOT EXISTS variableONfield

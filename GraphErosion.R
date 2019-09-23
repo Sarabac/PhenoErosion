@@ -149,3 +149,18 @@ drawErosion = function(culture, phase, erosion, NDVI, precipitation, date_limits
 
   return(graph)
 }
+
+plot_extracted_data = function(conn, field_id){
+  tbl(conn , "WeightMeasure") %>%
+    group_by(Field_ID, VarName, Date) %>% 
+    summarise() %>% 
+    collect() %>% ungroup() %>% 
+    filter(Field_ID == field_id) %>% 
+    ggplot(aes(x = as.Date(Date), y = VarName)) + 
+    geom_point() +
+    xlab("Date") + 
+    theme(axis.text.x=element_text(angle=30, hjust=1),
+          axis.text.x.top = element_text(angle = 30, vjust=0, hjust=0),
+          axis.title.y=element_blank()
+    )
+}
