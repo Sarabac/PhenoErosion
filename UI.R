@@ -41,7 +41,8 @@ MAP = fluidPage(
     mainPanel(leafletOutput("map", height = "600px")),
     position = "right"),
     class="content"
-  )
+  ),
+  fluidRow(plotOutput("plot_extracted_data"))
   
 )
 
@@ -125,8 +126,10 @@ editField = function(conn, Field_ID){
   }
   ### Culture ###
   culture = fbase %>% dplyr::select(Culture_ID, Declaration, Crop) %>%
-    distinct() %>%  collect() %>% 
-    mutate(display = paste(Crop," (", Declaration, ")", sep=""))
+    distinct() %>%
+    inner_join(tbl(conn, "Crop"), by = "Crop") %>% 
+    collect() %>% 
+    mutate(display = paste(Crop_name," (", Declaration, ")", sep=""))
   newCulture = div(
     selectInput("CropSelect", "Create Culture", choices = CROPS_CORRESPONDANCE),
     dateInput("newDeclaration", NULL, value = "0000-00-00")

@@ -47,7 +47,7 @@ server = function(input, output, session){
   # when the user add a new geojson file
   session$userData$currentGeo = list()
   # last field clicked
-  session$userData$currentShape = 0
+  session$userData$currentShape = reactiveVal(0)
   
   observeEvent(input$compute, {
     # extract the informations from the geotif
@@ -135,7 +135,7 @@ server = function(input, output, session){
   on_click = function(clickID){
     # function called when a feature is clicked
     if(is.null(clickID)){return(NULL)}
-    session$userData$currentShape = clickID
+    session$userData$currentShape(as.integer(clickID))
     dbExecute( # update the "selected" attribut of the clicked field
       session$userData$conn,
       "UPDATE Field set selected=NOT(selected) where Field_ID=?",
@@ -151,7 +151,7 @@ server = function(input, output, session){
   observe({ # when the user edit the field
     Name = input$editName
     conn = session$userData$conn
-    Field_ID = session$userData$currentShape
+    Field_ID = isolate(as.integer(session$userData$currentShape()))
     if(Field_ID==0){return(NULL)}
     # update field name
     dbExecute(conn, "UPDATE Field set Name=? where Field_ID=?",
@@ -197,7 +197,7 @@ server = function(input, output, session){
     # if the user click on the deleteField button
     # in the field panel
     conn = session$userData$conn
-    Field_ID = session$userData$currentShape
+    Field_ID = session$userData$currentShape()
     dbExecute(conn, "DELETE from Field where Field_ID = ?",
               params = list(Field_ID))
     leafletProxy("map") %>% removeShape(Field_ID)
@@ -274,6 +274,16 @@ server = function(input, output, session){
       )
       return(graph)
     }, height = input$plotHeight)
+  })
+  
+  output$plot_extracted_data = renderPlot({
+    field_id = session$userData$currentShape()
+    print(field_id)
+    graph = plot_extracted_data(
+      session$userData$conn,
+      field_id
+      )
+    return(graph)
   })
 
   

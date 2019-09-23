@@ -1,7 +1,8 @@
 @import url('//fonts.googleapis.com/css?family=Lobster|Cabin:400,700');
 
 body{
-  font: bold 12px/30px Arial, serif
+  font: bold 12px/30px Arial, serif;
+  padding-left: 20px;
 }
 
 html, body{
