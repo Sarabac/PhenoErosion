@@ -1,6 +1,9 @@
 #https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
 #https://plotly-r.com/
 #W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
+#u = rgdal::readOGR("field_test/qgis2", "bb")
+# rgdal::writeOGR(as_Spatial(m), "field_test/qgis2", "bb", "SQLite", overwrite_layer = TRUE)
+
 W.DIR = "~/Dropbox/Kuhn/phenology/PhenoErosion"
 setwd(W.DIR)
 
