@@ -1,7 +1,7 @@
 @import url('//fonts.googleapis.com/css?family=Lobster|Cabin:400,700');
 
 body{
-  font: bold 12px/30px Arial, serif
+  font: bold 12px/30px Arial, serif;
 }
 
 html, body{
@@ -13,8 +13,13 @@ html, body{
   top: 0;
   left: 0;
   margin-bottom: 0;
+  padding-left: 35px;
 }
 
+/* Remove some display bugs */
+.nav a:not([data-value]) {
+	display: none;
+}
 
 .container-fluid {
   padding-right: 0;
@@ -26,7 +31,6 @@ html, body{
 .tabheader {
 	width: 100%;
 	background-color: #e7e7e7;
-	margin-bottom: 10px;
   margin-right: 0px;
   margin-left: 0px;
   position: sticky;
@@ -41,6 +45,10 @@ html, body{
 	display: flex;
 	flex-direction: row;
 	justify-content: space-around;
+}
+
+.row{
+	padding: 3px 30px;
 }
 
 /* MAPD */
@@ -114,4 +122,19 @@ html, body{
 .culture {
 	grid-column: 2;
 	grid-row: 2;
+}
+
+/* Modal Import GeoJson */
+.modal-body{
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  margin: 5px;
+  grid-gap: 10px;
+  justify-items: start;
+  align-items: center;
+}
+
+.modal-body > .shiny-input-container{
+  width: auto;
 }
