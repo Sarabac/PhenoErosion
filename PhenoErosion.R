@@ -49,6 +49,16 @@ server = function(input, output, session){
   # last field clicked
   session$userData$currentShape = reactiveVal(0)
   
+  observeEvent(input$selectAll, {select_deselect(1)})
+  observeEvent(input$deselectAll, {select_deselect(0)})
+  select_deselect = function(selection){
+    dbExecute(session$userData$conn,
+              paste("UPDATE Field set selected=", selection, sep="") )
+    field_id = tbl(session$userData$conn, "Field") %>% pull(Field_ID)
+    leafletProxy("map") %>% 
+      create_layer(session$userData$conn,field_id)
+  }
+  
   observeEvent(input$compute, {
     # extract the informations from the geotif
     # when the user click on the "compute" button
@@ -97,13 +107,7 @@ server = function(input, output, session){
     Crop = setNames( c("", idvar), c("None", idvar))
     Declaration = setNames( c("", idvar), c("None", idvar))
     Erosion = setNames( c("", idvar), c("None", idvar))
-    showModal(modalDialog(
-      radioButtons("varname", "ID Variable", choices=Name),
-      radioButtons("varcrop", "Crop Variable", choices=Crop),
-      radioButtons("varerosion", "Erosion Date variable", choices=Erosion),
-      footer = tagList(actionButton("ok", "OK")),
-      title = "Import Geojson")
-    )
+    showModal(MODALIMPORT(Name, Crop, Erosion))
   })
   
   observeEvent(input$ok,{
@@ -252,7 +256,9 @@ server = function(input, output, session){
     })
   SgetPrecipitation = reactive({
     graphData()
-    return( getPrecipitation(session$userData$conn) )
+    choiceprecis <<- input$preciChoice
+    return( getPrecipitation(session$userData$conn,
+            varName = input$preciChoice ))
     })
   SgetNDVI = reactive({
     graphData()
@@ -264,13 +270,22 @@ server = function(input, output, session){
       lim = input$DatesMerge
       #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
       #if(is.null(dat)){return(NULL)}
+      field_corress = dbGetQuery(
+        session$userData$conn,
+        "select Field_ID, GroupName ||'\n'|| Name as name from Field where selected"
+        )
+      if(!nrow(field_corress)){
+        return(ggplot() + geom_text(aes(x=0, y=0, label="No field selected")))
+      }
+      field_list = setNames(field_corress$name, field_corress$Field_ID)
       graph = drawErosion(
         SgetCulture(),
         SgetPhase(),
         SgetErosion(),
         filter(SgetNDVI(), input$NDVIchoice), 
         SgetPrecipitation(),
-        date_limits =c(lim[1], lim[2])
+        date_limits =c(lim[1], lim[2]),
+        field_list
       )
       return(graph)
     }, height = input$plotHeight)
