@@ -32,19 +32,16 @@ PHASE.INFO = tibble(
 RASTERINFO = tibble(
   VarName = c(
     #"NDVI", 
-    "RADOLANGT10MM", "RADOLANMAX", "RADOLANSUM"
+    "RADOLANGT10MM"#, "RADOLANMAX", "RADOLANSUM"
   ),
   sources = list(
     #c(list.files("/home/luxis/Dropbox/MODIS","_NDVI_.*\\.tif$", full.names = TRUE)),
-    c(list.files("/home/luxis/Dropbox/RadolanIndex",
-                 "RADOLANGT10MM.*\\.asc$", full.names = TRUE)),
-    c(list.files("/home/luxis/Dropbox/RadolanIndex",
-                 "RADOLANMAX.*\\.asc$", full.names = TRUE)),
-    c(list.files("/home/luxis/Dropbox/RadolanIndex",
-                 "RADOLANSUM.*\\.asc$", full.names = TRUE))
+    c(list.files("/home/luxis/Dropbox/RadolanIndex", "RADOLANGT10MM.*\\.asc$", full.names = TRUE))#,
+    #c(list.files("/home/luxis/Dropbox/RadolanIndex", "RADOLANMAX.*\\.asc$", full.names = TRUE)),
+    #c(list.files("/home/luxis/Dropbox/RadolanIndex", "RADOLANSUM.*\\.asc$", full.names = TRUE))
   ),
-  SourceName = c(#"MODIS", 
-                 "PRECIPITATION", "PRECIPITATION", "PRECIPITATION")
+  SourceName = c(#"MODIS",  "PRECIPITATION", "PRECIPITATION", 
+    "PRECIPITATION")
 ) %>% 
   # the column are the same with Phase Info
   bind_rows(PHASE.INFO) 

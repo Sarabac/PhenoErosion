@@ -23,15 +23,6 @@ MAP = fluidPage(
       fileInput("openData", "Open")
       ),
     fluidRow(
-      pickerInput(
-        inputId = "selectVar",
-        label = "Select Variable",
-        choices=list("var"=1),
-        multiple = TRUE,
-        options = list(`actions-box` = TRUE)
-      ),
-      sliderInput("selectYear", "Select Year",
-                  min = 2000, max = 2020, value = c(2010, 2012)),
       actionButton("compute", "Compute", icon = icon("play")),
       actionButton("deselectAll", "Deselect All"),
       actionButton("selectAll", "select All")
