@@ -17,7 +17,7 @@ html, body{
 }
 
 /* Remove some display bugs */
-.nav a:not([data-value]) {
+.nav a:not([data-value]){
 	display: none;
 }
 
@@ -155,4 +155,8 @@ html, body{
 
 .modal-body > .shiny-input-container{
   width: auto;
+}
+
+#preciChoice {
+  display: none;
 }

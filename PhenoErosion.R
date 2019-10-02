@@ -140,19 +140,10 @@ server = function(input, output, session){
   })
   
   observe({on_click(input$map_shape_click[["id"]])})   #for polygons   
-  observe({on_click(input$map_marker_click[["id"]])})  #for points
   on_click = function(clickID){
     # function called when a feature is clicked
     if(is.null(clickID)){return(NULL)}
-    session$userData$currentShape(as.integer(clickID))
-    dbExecute( # update the "selected" attribut of the clicked field
-      session$userData$conn,
-      "UPDATE Field set selected=NOT(selected) where Field_ID=?",
-      params = list(clickID)
-      )
-    leafletProxy("map") %>% 
-      create_layer(session$userData$conn, clickID)
-    # update the field editor with the current field
+    session$userData$currentShape(clickID)
     removeUI("#currentField")
     editField(session$userData$conn, clickID)
   }
@@ -209,12 +200,29 @@ server = function(input, output, session){
   observeEvent(input$deleteField, {
     # if the user click on the deleteField button
     # in the field panel
-    conn = session$userData$conn
     Field_ID = session$userData$currentShape()
-    dbExecute(conn, "DELETE from Field where Field_ID = ?",
+    print(paste("ID", Field_ID))
+    print(collect(tbl(session$userData$conn, "Field")))
+    dbExecute(session$userData$conn, 
+              "DELETE from Field where Field_ID = ?",
               params = list(Field_ID))
+    print(collect(tbl(session$userData$conn, "Field")))
     leafletProxy("map") %>% removeShape(Field_ID)
     removeUI("#currentField")
+  })
+  observeEvent(input$toogleSelect, {
+    # if the user click on the deleteField button
+    # in the field panel
+    conn = session$userData$conn
+    Field_ID = session$userData$currentShape()
+    dbExecute(conn, "UPDATE Field 
+              set selected = not(selected) 
+              where Field_ID = ?",
+              params = list(Field_ID))
+    leafletProxy("map") %>%
+      create_layer(session$userData$conn, Field_ID)
+    removeUI("#currentField")
+    editField(conn, Field_ID)
   })
   
   output$downloadData <- downloadHandler(

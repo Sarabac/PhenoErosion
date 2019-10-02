@@ -35,7 +35,7 @@ create table if not exists Field(
   GroupName VARCHAR,
   Name VARCHAR,
   geometry POLYGON,
-  selected BOOLEAN default 0
+  selected BOOLEAN default 1
 );
 
 

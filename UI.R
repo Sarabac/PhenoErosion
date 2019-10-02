@@ -96,10 +96,13 @@ editField = function(conn, Field_ID){
   ### Field ###
   Zone_Name = fbase %>% pull(GroupName) %>% unique()
   Name = fbase %>% pull(Name) %>% unique()
+  Selected = fbase %>% pull(selected) %>% unique()
+  selectLabel = ifelse(Selected, "Deselect", "Select")
   field = h3( # zone containing name aof the field
     actionButton("deleteField", "DELETE", icon = icon("trash")),
     Zone_Name,
     textInput("editName", NULL, value=Name, width = "25%"),
+    actionButton("toogleSelect", selectLabel),
     class = "field"
   )
   ### Erosion ###
