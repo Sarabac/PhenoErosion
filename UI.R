@@ -122,6 +122,7 @@ editField = function(conn, Field_ID){
     conn, "select VarName, crop_code from variableCrop") %>% 
     drop_na()
   crop_correspondance = setNames(crop_corres$crop_code, crop_corres$VarName)
+  crop_correspondance["--select crop--"] = 0
   culture = fbase %>% dplyr::select(Culture_ID, Declaration, Crop) %>%
     distinct() %>%
     inner_join(tbl(conn, "Crop"), by = "Crop") %>% 
@@ -129,14 +130,14 @@ editField = function(conn, Field_ID){
     mutate(display = paste(Crop_name," (", Declaration, ")", sep=""))
   newCulture = div(
     selectInput("CropSelect", "Create Culture",
-                choices = crop_correspondance),
-    dateInput("newDeclaration", NULL, value = "0000-00-00")
+                choices = crop_correspondance, selected = 0)
+    #,dateInput("newDeclaration", NULL, value = "0000-00-00")
   )
   if(nrow(drop_na(culture))){
     # when checked, deleteErosion remove the corresponding erosion crop
     deleteCulture = checkboxGroupInput(
       "deleteCulture", "Delete Culture",
-      choices = setNames(culture$Culture_ID, culture$display)
+      choices = setNames(culture$Culture_ID, culture$Crop_name)
     )
     culturediv = div(newCulture, deleteCulture, class="culture") 
   }else{

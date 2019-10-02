@@ -124,6 +124,24 @@ html, body{
 	grid-row: 2;
 }
 
+/* to simplify the interface*/
+#deleteCulture .shiny-options-group div{
+  display:none
+}
+
+#deleteCulture>label{
+  display:none
+}
+
+#deleteCulture .shiny-options-group .checkbox:first-child{
+  display: inline;
+  font-size: 12pt
+}
+
+#deleteCulture .shiny-options-group .checkbox:first-child input{
+  display: none
+}
+
 /* Modal Import GeoJson */
 .modal-body{
   display: grid;

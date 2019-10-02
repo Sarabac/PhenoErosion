@@ -186,14 +186,18 @@ server = function(input, output, session){
                 param = list(culID))
     })
     # add created culture
-    cuturedate = input$newDeclaration
-    cuturecrop = isolate(input$CropSelect) 
-    if(length(cuturedate)){
-      dbWriteTable(conn, "Culture",tibble(
-        Field_ID = Field_ID,
-        Declaration = as.character(cuturedate),
-        Crop = cuturecrop
-      ), append = TRUE)
+    #cuturedate = input$newDeclaration
+    #cuturecrop = isolate(input$CropSelect) 
+    culturecrop = input$CropSelect
+    if(culturecrop != "0"){
+      cuturedate = year(seq(minDate, maxDate, by = "year"))
+      for(Cdate in cuturedate){
+        dbWriteTable(session$userData$conn, "Culture",tibble(
+          Field_ID = Field_ID,
+          Declaration = paste(cuturedate, "-05-31", sep = ""),
+          Crop = culturecrop
+        ), append = TRUE)
+      }
     }
     # refresh edit panel
     leafletProxy("map") %>%
