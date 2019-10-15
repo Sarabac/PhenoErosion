@@ -60,36 +60,41 @@ server = function(input, output, session){
   }
   
   observeEvent(input$compute, {
+    print("ok1")
     # extract the informations from the geotif
     # when the user click on the "compute" button
-    var_ID <<- input$selectVar
-    sliderYears <<- input$selectYear
-    Years <<- seq(sliderYears[1], sliderYears[2])
-    field_id = tbl(conn, "Field") %>% 
+    var_ID = tbl(session$userData$conn, "Variable") %>% pull(Var_ID)
+    eroyears = dbGetQuery(session$userData$conn,
+                  "Select strftime('%Y', Event_Date)as Year
+                  from ErosionEvent e
+                  inner join Field f on f.Field_id = e.Field_id
+                  where selected") %>% 
+      mutate(Year = as.numeric(Year),
+             nexty = Year +1,
+             lasty = Year - 1)
+    Years = unique(c(eroyears$Year, eroyears$nexty, eroyears$lasty))
+    field_id = tbl(session$userData$conn, "Field") %>% 
       filter(selected) %>% pull(Field_ID)
-    Source_ids = tbl(conn, "Variable") %>% 
-      inner_join(tbl(conn, "DataSource"), by="Source_ID") %>% 
-      filter(Var_ID%in%var_ID) %>% 
+    Source_ids = tbl(session$userData$conn, "DataSource") %>% 
       pull(Source_ID) %>% unique()
+    print("ok2")
     # if no field or no variable selected
-    if(length(field_id)==0|length(var_ID)==0){return(NULL)}
+    if(length(field_id)==0|length(var_ID)==0|length(Years)==0){return(NULL)}
+    print("ok3")
     
     showModal(modalDialog(
       helpText("Loading"),
       footer =NULL))
     for(sid in Source_ids){
-      Import_Weight(conn, sid, field_id)
+      Import_Weight(session$userData$conn, sid, field_id)
     }
     progress <- Progress$new() # the progress bar
     # Make sure it closes when we exit this reactive, even if there's an error
     on.exit(progress$close())
     for (vid in var_ID){
-      progress$set(value = 0,
-                   message = tbl(conn, "Variable") %>%
-                     filter(Var_ID==vid) %>% pull(VarName)
-                   )
-      Import_Measure(session$userData$conn, vid, field_id,
-                    Years, progresfunc = progress$set)
+      progress$set(value = 0, message = tbl(session$userData$conn, "Variable") %>%
+                     filter(Var_ID==vid) %>% pull(VarName) )
+      Import_Measure(session$userData$conn, vid, field_id, Years, progresfunc = progress$set)
     }
     removeModal()
   })
@@ -135,19 +140,10 @@ server = function(input, output, session){
   })
   
   observe({on_click(input$map_shape_click[["id"]])})   #for polygons   
-  observe({on_click(input$map_marker_click[["id"]])})  #for points
   on_click = function(clickID){
     # function called when a feature is clicked
     if(is.null(clickID)){return(NULL)}
-    session$userData$currentShape(as.integer(clickID))
-    dbExecute( # update the "selected" attribut of the clicked field
-      session$userData$conn,
-      "UPDATE Field set selected=NOT(selected) where Field_ID=?",
-      params = list(clickID)
-      )
-    leafletProxy("map") %>% 
-      create_layer(session$userData$conn, clickID)
-    # update the field editor with the current field
+    session$userData$currentShape(clickID)
     removeUI("#currentField")
     editField(session$userData$conn, clickID)
   }
@@ -181,14 +177,18 @@ server = function(input, output, session){
                 param = list(culID))
     })
     # add created culture
-    cuturedate = input$newDeclaration
-    cuturecrop = isolate(input$CropSelect) 
-    if(length(cuturedate)){
-      dbWriteTable(conn, "Culture",tibble(
-        Field_ID = Field_ID,
-        Declaration = as.character(cuturedate),
-        Crop = cuturecrop
-      ), append = TRUE)
+    #cuturedate = input$newDeclaration
+    #cuturecrop = isolate(input$CropSelect) 
+    culturecrop = input$CropSelect
+    if(culturecrop != "0"){
+      cuturedate = year(seq(minDate, maxDate, by = "year"))
+      for(Cdate in cuturedate){
+        dbWriteTable(session$userData$conn, "Culture",tibble(
+          Field_ID = Field_ID,
+          Declaration = paste(cuturedate, "-05-31", sep = ""),
+          Crop = culturecrop
+        ), append = TRUE)
+      }
     }
     # refresh edit panel
     leafletProxy("map") %>%
@@ -200,12 +200,29 @@ server = function(input, output, session){
   observeEvent(input$deleteField, {
     # if the user click on the deleteField button
     # in the field panel
-    conn = session$userData$conn
     Field_ID = session$userData$currentShape()
-    dbExecute(conn, "DELETE from Field where Field_ID = ?",
+    print(paste("ID", Field_ID))
+    print(collect(tbl(session$userData$conn, "Field")))
+    dbExecute(session$userData$conn, 
+              "DELETE from Field where Field_ID = ?",
               params = list(Field_ID))
+    print(collect(tbl(session$userData$conn, "Field")))
     leafletProxy("map") %>% removeShape(Field_ID)
     removeUI("#currentField")
+  })
+  observeEvent(input$toogleSelect, {
+    # if the user click on the deleteField button
+    # in the field panel
+    conn = session$userData$conn
+    Field_ID = session$userData$currentShape()
+    dbExecute(conn, "UPDATE Field 
+              set selected = not(selected) 
+              where Field_ID = ?",
+              params = list(Field_ID))
+    leafletProxy("map") %>%
+      create_layer(session$userData$conn, Field_ID)
+    removeUI("#currentField")
+    editField(conn, Field_ID)
   })
   
   output$downloadData <- downloadHandler(

@@ -176,7 +176,7 @@ load4leaflet = function(conn, path, name, varname="",
     result = rename(named, Name = !!varname)
   }
   field4database = result %>% 
-    transmute(Field_ID, Name, GroupName = name, selected = FALSE )
+    transmute(Field_ID, Name, GroupName = name)
   dbWriteTable(conn, "Field", field4database, append = TRUE)
   # write the erosion Field
   field = result %>% st_drop_geometry()

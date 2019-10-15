@@ -35,7 +35,7 @@ create table if not exists Field(
   GroupName VARCHAR,
   Name VARCHAR,
   geometry POLYGON,
-  selected BOOLEAN default 0
+  selected BOOLEAN default 1
 );
 
 
@@ -46,7 +46,7 @@ create table if not exists Culture(
   Culture_ID INTEGER PRIMARY KEY,
   Declaration VARCHAR NOT NULL ON CONFLICT IGNORE, -- date of crop declaration
   Crop INTEGER NOT NULL ON CONFLICT IGNORE,
-  UNIQUE(Field_ID, Declaration) ON CONFLICT IGNORE,
+  UNIQUE(Field_ID, Declaration) ON CONFLICT REPLACE,
   FOREIGN KEY (Field_ID) REFERENCES Field(Field_ID) ON DELETE CASCADE
 );
 

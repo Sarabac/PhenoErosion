@@ -23,15 +23,6 @@ MAP = fluidPage(
       fileInput("openData", "Open")
       ),
     fluidRow(
-      pickerInput(
-        inputId = "selectVar",
-        label = "Select Variable",
-        choices=list("var"=1),
-        multiple = TRUE,
-        options = list(`actions-box` = TRUE)
-      ),
-      sliderInput("selectYear", "Select Year",
-                  min = 2000, max = 2020, value = c(2010, 2012)),
       actionButton("compute", "Compute", icon = icon("play")),
       actionButton("deselectAll", "Deselect All"),
       actionButton("selectAll", "select All")
@@ -105,10 +96,13 @@ editField = function(conn, Field_ID){
   ### Field ###
   Zone_Name = fbase %>% pull(GroupName) %>% unique()
   Name = fbase %>% pull(Name) %>% unique()
+  Selected = fbase %>% pull(selected) %>% unique()
+  selectLabel = ifelse(Selected, "Deselect", "Select")
   field = h3( # zone containing name aof the field
     actionButton("deleteField", "DELETE", icon = icon("trash")),
     Zone_Name,
     textInput("editName", NULL, value=Name, width = "25%"),
+    actionButton("toogleSelect", selectLabel),
     class = "field"
   )
   ### Erosion ###
@@ -131,6 +125,7 @@ editField = function(conn, Field_ID){
     conn, "select VarName, crop_code from variableCrop") %>% 
     drop_na()
   crop_correspondance = setNames(crop_corres$crop_code, crop_corres$VarName)
+  crop_correspondance["--select crop--"] = 0
   culture = fbase %>% dplyr::select(Culture_ID, Declaration, Crop) %>%
     distinct() %>%
     inner_join(tbl(conn, "Crop"), by = "Crop") %>% 
@@ -138,14 +133,14 @@ editField = function(conn, Field_ID){
     mutate(display = paste(Crop_name," (", Declaration, ")", sep=""))
   newCulture = div(
     selectInput("CropSelect", "Create Culture",
-                choices = crop_correspondance),
-    dateInput("newDeclaration", NULL, value = "0000-00-00")
+                choices = crop_correspondance, selected = 0)
+    #,dateInput("newDeclaration", NULL, value = "0000-00-00")
   )
   if(nrow(drop_na(culture))){
     # when checked, deleteErosion remove the corresponding erosion crop
     deleteCulture = checkboxGroupInput(
       "deleteCulture", "Delete Culture",
-      choices = setNames(culture$Culture_ID, culture$display)
+      choices = setNames(culture$Culture_ID, culture$Crop_name)
     )
     culturediv = div(newCulture, deleteCulture, class="culture") 
   }else{
