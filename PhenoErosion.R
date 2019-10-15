@@ -1,16 +1,17 @@
-#https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
-#https://plotly-r.com/
-#W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
-#u = rgdal::readOGR("field_test/qgis2", "bb")
+# Main function
+# https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
+# https://plotly-r.com/
+# W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
+# u = rgdal::readOGR("field_test/qgis2", "bb")
 # rgdal::writeOGR(as_Spatial(m), "field_test/qgis2", "bb", "SQLite", overwrite_layer = TRUE)
 
-W.DIR = "~/Dropbox/Kuhn/phenology/PhenoErosion"
+W.DIR = "~/Dropbox/Kuhn/phenology/PhenoErosion1"
 setwd(W.DIR)
 
-source("Functions_Pheno.R")
-source("Database.R")
-source("GraphErosion.R")
-source("UI.R")
+source("Functions/Functions_Pheno.R")
+source("Functions/Database.R")
+source("Functions/GraphErosion.R")
+source("Functions/UI.R")
 library(tidyverse)
 library(shiny)
 library(shinyWidgets)
@@ -35,9 +36,8 @@ server = function(input, output, session){
   # the connection object to store all the data
   session$userData$conn = Init_database(dbConnect(RSQLite::SQLite(), ":memory:",
                                                   loadable.extensions = TRUE))
-  conn <<- session$userData$conn
   # define the content of the variables picker
-  variables <<- tbl(session$userData$conn, "variableCrop") %>% 
+  variables = tbl(session$userData$conn, "variableCrop") %>% 
     collect() %>% group_by(SourceName) %>%
     summarise(Source = list(setNames(Var_ID, VarName)))
   Vchoice = setNames(variables$Source, variables$SourceName)
@@ -60,7 +60,6 @@ server = function(input, output, session){
   }
   
   observeEvent(input$compute, {
-    print("ok1")
     # extract the informations from the geotif
     # when the user click on the "compute" button
     var_ID = tbl(session$userData$conn, "Variable") %>% pull(Var_ID)
@@ -77,10 +76,8 @@ server = function(input, output, session){
       filter(selected) %>% pull(Field_ID)
     Source_ids = tbl(session$userData$conn, "DataSource") %>% 
       pull(Source_ID) %>% unique()
-    print("ok2")
     # if no field or no variable selected
     if(length(field_id)==0|length(var_ID)==0|length(Years)==0){return(NULL)}
-    print("ok3")
     
     showModal(modalDialog(
       helpText("Loading"),
@@ -201,12 +198,9 @@ server = function(input, output, session){
     # if the user click on the deleteField button
     # in the field panel
     Field_ID = session$userData$currentShape()
-    print(paste("ID", Field_ID))
-    print(collect(tbl(session$userData$conn, "Field")))
     dbExecute(session$userData$conn, 
               "DELETE from Field where Field_ID = ?",
               params = list(Field_ID))
-    print(collect(tbl(session$userData$conn, "Field")))
     leafletProxy("map") %>% removeShape(Field_ID)
     removeUI("#currentField")
   })
@@ -273,7 +267,6 @@ server = function(input, output, session){
     })
   SgetPrecipitation = reactive({
     graphData()
-    choiceprecis <<- input$preciChoice
     return( getPrecipitation(session$userData$conn,
             varName = input$preciChoice ))
     })
@@ -285,8 +278,6 @@ server = function(input, output, session){
   observe({
     output$DOY_GRAPH = renderPlot({
       lim = input$DatesMerge
-      #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
-      #if(is.null(dat)){return(NULL)}
       field_corress = dbGetQuery(
         session$userData$conn,
         "select Field_ID, GroupName ||'\n'|| Name as name from Field where selected"
@@ -310,7 +301,6 @@ server = function(input, output, session){
   
   output$plot_extracted_data = renderPlot({
     field_id = session$userData$currentShape()
-    print(field_id)
     graph = plot_extracted_data(
       session$userData$conn,
       field_id

@@ -29,7 +29,7 @@ MAP = fluidPage(
     ),
     width = "100%", class = "tabheader"),
   fluidRow( sidebarLayout(
-    sidebarPanel(div(id="fieldedit")),
+    sidebarPanel(div(h4("Click on a Field to edit it"), id="fieldedit")),
     mainPanel(leafletOutput("map", height = "600px")),
     position = "right"),
     class="content"

@@ -1,3 +1,4 @@
+# Functions used by the function Database.R
 library(tidyverse)
 library(raster)
 library(DBI)
