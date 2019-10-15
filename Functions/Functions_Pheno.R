@@ -167,7 +167,7 @@ load4leaflet = function(conn, path, name, varname="",
     polyg = sf::st_transform(path,LEAFLET_CRS)
   }
   lastID = tbl(conn, "Field") %>%
-    summarise(m = coalesce(max(Field_ID, na.rm = TRUE), 1)) %>% 
+    summarise(m = coalesce(max(Field_ID, na.rm = TRUE), 0)) %>% 
     pull(m)
   named = mutate(polyg, Field_ID = as.integer(row_number() + lastID) )
   if(varname==""){ # create a name with the row number

@@ -28,11 +28,9 @@ period_labelling = function(from, to){
 
 selected_fields = function(conn){tbl(conn, "Field") %>% filter(selected) %>% pull(Field_ID)}
 
-conn  = dbConnect(RSQLite::SQLite(), "/home/luxis/Dropbox/Kuhn/phenology/PhenoErosion/field_test/PhenoErosion(6).sqlite")
-
 getPhase = function(conn, TPcover = 0, TFcover = 0){
   
-  Ph <<- tbl(conn, "Phase") %>% collect() %>% 
+  Ph = tbl(conn, "Phase") %>% collect() %>% 
     filter(Field_ID%in%selected_fields(conn)) %>%
     rename(Date = Transition) %>% 
     filter(Pcover>=TPcover) %>% 
@@ -103,14 +101,7 @@ drawErosion = function(culture, phase, erosion, NDVI, precipitation,
   #     "Area": spatial entities ID
   #     "Crop": the crop ID
   # date_breaks: character
-  culture <<- culture
-  phase <<- phase
-  erosion <<- erosion
-  NDVI <<- NDVI
-  precipitation <<- precipitation
-  date_limits <<- date_limits
-  field_corress <<- field_corress
-
+  
   if(!is.null(date_limits)){
     date_limits = as.Date(date_limits)
     date_breaks = period_labelling(date_limits[1], date_limits[2])

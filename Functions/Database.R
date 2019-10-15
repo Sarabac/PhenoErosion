@@ -4,8 +4,8 @@ library(raster)
 library(lubridate)
 library(velox)
 library(sf)
-source("Utils.R")
-source("Functions_Pheno.R")
+source("Functions/Utils.R")
+source("Functions/Functions_Pheno.R")
 source("config.R")
 
 
@@ -48,7 +48,7 @@ for(i in 1:nrow(RASTERSOURCES)){
   }
 }
 
-Init_database = function(conn, init_sql = "Init_Database.sql"){
+Init_database = function(conn, init_sql = "Functions/Init_Database.sql"){
   dbWriteTable(conn, "Crop", CROPS_CORRESPONDANCE_FRAME,
                overwrite = TRUE)
   dbWriteTable(conn, "PhaseCode", phasesCode, overwrite = TRUE)
