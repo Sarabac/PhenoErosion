@@ -1,7 +1,8 @@
-#https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
-#https://plotly-r.com/
-#W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
-#u = rgdal::readOGR("field_test/qgis2", "bb")
+# Main function
+# https://moderndata.plot.ly/plotly-4-7-0-now-on-cran/
+# https://plotly-r.com/
+# W.DIR <- dirname(rstudioapi::getActiveDocumentContext()$path)
+# u = rgdal::readOGR("field_test/qgis2", "bb")
 # rgdal::writeOGR(as_Spatial(m), "field_test/qgis2", "bb", "SQLite", overwrite_layer = TRUE)
 
 W.DIR = "~/Dropbox/Kuhn/phenology/PhenoErosion"
@@ -79,6 +80,9 @@ server = function(input, output, session){
       pull(Source_ID) %>% unique()
     print("ok2")
     # if no field or no variable selected
+    print(field_id)
+    print(var_ID)
+    print(Years)
     if(length(field_id)==0|length(var_ID)==0|length(Years)==0){return(NULL)}
     print("ok3")
     
@@ -273,7 +277,6 @@ server = function(input, output, session){
     })
   SgetPrecipitation = reactive({
     graphData()
-    choiceprecis <<- input$preciChoice
     return( getPrecipitation(session$userData$conn,
             varName = input$preciChoice ))
     })
@@ -285,8 +288,6 @@ server = function(input, output, session){
   observe({
     output$DOY_GRAPH = renderPlot({
       lim = input$DatesMerge
-      #dat = lapply(gdata, function(x){ filter(x, Date>=lim[1] & Date <= lim[2])})
-      #if(is.null(dat)){return(NULL)}
       field_corress = dbGetQuery(
         session$userData$conn,
         "select Field_ID, GroupName ||'\n'|| Name as name from Field where selected"
